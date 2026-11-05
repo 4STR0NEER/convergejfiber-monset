@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+/* Converge-J Fiber brand. Orange -> ember -> magenta -> plum -> violet, on violet-black.
+   Brand vars are the only thing to change for another franchise. */
+:root {
+  --brand-orange: #ff6b1a;
+  --brand-ember: #f2542d;
+  --brand-magenta: #d6337f;
+  --brand-plum: #a23bc4;
+  --brand-violet: #7c3aed;
+  --brand-black: #0d0b14;
+  --brand-gradient: linear-gradient(100deg, var(--brand-orange), var(--brand-magenta) 55%, var(--brand-violet));
+
+  --bg: #faf8f6;
+  --surface: #ffffff;
+  --surface-2: #f3f0f4;
+  --text: #15121c;
+  --muted: #5e5869;
+  --border: #e7e2ea;
+  --accent: #c2470a;        /* orange dark enough for text on light */
+  --accent-2: #6d28d9;      /* violet text on light */
+  --ok: #15803d;
+  --bad: #b91c1c;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d0b14;
+    --surface: #16131f;
+    --surface-2: #1e1a2a;
+    --text: #f3f0f7;
+    --muted: #a39db0;
+    --border: #2a2538;
+    --accent: #ff8a47;
+    --accent-2: #a78bfa;
+    --ok: #4ade80;
+    --bad: #f87171;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d0b14;
+  --surface: #16131f;
+  --surface-2: #1e1a2a;
+  --text: #f3f0f7;
+  --muted: #a39db0;
+  --border: #2a2538;
+  --accent: #ff8a47;
+  --accent-2: #a78bfa;
+  --ok: #4ade80;
+  --bad: #f87171;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-ok: var(--ok);
+  --color-bad: var(--bad);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  font-variant-numeric: tabular-nums;
+}
