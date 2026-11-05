@@ -5,7 +5,7 @@ Living file. Updated at the end of every phase. Three parts:
 2. **Decisions made** (answered by Monset, with date).
 3. **Assumptions** we made about process and data, so nothing assumed gets mistaken for confirmed.
 
-Last updated: 2026-11-05 (Phase 6, prototype complete)
+Last updated: 2026-11-06 (after Phase 6: phone view)
 
 ---
 
@@ -64,6 +64,7 @@ Last updated: 2026-11-05 (Phase 6, prototype complete)
 | 2026-11-05 | Own GitHub repo, pushed after each phase. |
 | 2026-11-05 | Command Center defaults to the **dark** theme; light theme via toggle (remembered per browser). |
 | 2026-11-05 | "Wedge" and "fluid" motion goes on the **main nav tabs**. Motion Studio not installed. |
+| 2026-11-06 | On phones the Command Center opens as a **list, not the map**: people on the go should not have to pinch and pan. The map is one tap away. |
 
 ## 3. Assumptions
 
@@ -158,3 +159,10 @@ All data is invented. Nothing comes from Converge or any real contractor.
 - **Route data import** is available in Settings and kept in the browser only. Imported files without node points keep the assumed NOC and hubs. POs with no line in the file stay off the map; their crews keep the seed position.
 - **Code splitting**: every screen is its own chunk, and the map stack loads after the KPI strip paints.
 - **Keyboard path into the map**: "Find a PO" search; a skip link before the navigation.
+
+### Phone view (2026-11-06)
+
+- **Phones (under 768 px) get a list instead of the 3D map** on the Command Center: KPI strip, filters, then three tabs. **Attention** = Delayed, At Risk, Trending Late or with an open blocker, most urgent first (Delayed by LD, then At Risk by days left, then Trending Late by gap). **Near me** sorts open POs by distance from the phone's location to each PO's route. **All** = everything in the filters.
+- Each card shows status, the first plain-language reason, open blockers, days late or to target, and LD, and opens the PO detail page.
+- **Open map** loads the map only on demand (the map code is not even downloaded until then), in 2D by default on phones, with "Back to list". Arriving from "Show on map" opens the map straight away.
+- Crews still use the Field App (`/field`), which has no map; this list is for supervisors and PMs on site.

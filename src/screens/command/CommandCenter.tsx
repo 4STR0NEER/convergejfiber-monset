@@ -1,33 +1,61 @@
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { AnimatePresence, useReducedMotion } from 'motion/react'
-import { Box, Map as MapIcon, RotateCcw } from 'lucide-react'
+import { Box, List, Map as MapIcon, RotateCcw } from 'lucide-react'
 import { STATUS_LABEL, STATUSES } from '../../domain/status'
 import { useData } from '../../state'
 import { FilterBar } from '../../ui/FilterBar'
 import { LineSample, StatusGlyph } from '../../ui/status'
 import { KpiStrip } from './KpiStrip'
 import { SidePanel } from './SidePanel'
+import { MobileGlance } from './MobileGlance'
 
 // deck.gl + MapLibre are most of the bundle: let the KPI strip and filters paint first.
 const HeroMap = lazy(() => import('./HeroMap').then(m => ({ default: m.HeroMap })))
 
+const PHONE = '(max-width: 767px)'
+function useIsPhone() {
+  const [phone, setPhone] = useState(() => window.matchMedia(PHONE).matches)
+  useEffect(() => {
+    const mq = window.matchMedia(PHONE), on = () => setPhone(mq.matches)
+    mq.addEventListener('change', on); return () => mq.removeEventListener('change', on)
+  }, [])
+  return phone
+}
+
 export function CommandCenter() {
   const { byId, selectedId } = useData()
   const reduce = !!useReducedMotion()
-  const [mode3d, setMode3d] = useState(true)
+  const phone = useIsPhone()
+  // Phones get the list; the map only when asked for (or when arriving from "Show on map").
+  const [showMap, setShowMap] = useState(() => !!selectedId)
+  const [mode3d, setMode3d] = useState(() => !window.matchMedia(PHONE).matches)
   const [reset, setReset] = useState(0)
   const selected = selectedId ? byId.get(selectedId) : undefined
+
+  if (phone && !showMap) return (
+    <div className="flex min-h-full flex-col">
+      <h1 className="sr-only">Command Center</h1>
+      <KpiStrip />
+      <FilterBar />
+      <MobileGlance onOpenMap={() => setShowMap(true)} />
+    </div>
+  )
 
   return (
     <div className="flex min-h-full flex-col md:h-full md:min-h-0">
       <h1 className="sr-only">Command Center</h1>
-      <KpiStrip />
+      {!phone && <KpiStrip />}
       <FilterBar><MapControls mode3d={mode3d} setMode3d={setMode3d} onReset={() => setReset(n => n + 1)} /></FilterBar>
       <div className="relative min-h-[68vh] flex-1 md:min-h-0">
         <Suspense fallback={<div role="status" className="grid h-full place-items-center text-sm text-muted">Loading the 3D map…</div>}>
           <HeroMap mode3d={mode3d} reduceMotion={reduce} resetSignal={reset} />
         </Suspense>
         <Legend />
+        {phone && (
+          <button onClick={() => setShowMap(false)} className="absolute left-1/2 top-3 z-10 flex h-10 -translate-x-1/2 items-center gap-1.5 rounded-full border border-border bg-surface px-4 text-sm font-semibold shadow-[var(--shadow)]">
+            <List size={15} />Back to list
+          </button>
+        )}
         <AnimatePresence>{selected && <SidePanel key={selected.po.id} ev={selected} />}</AnimatePresence>
       </div>
     </div>
@@ -56,7 +84,7 @@ function MapControls({ mode3d, setMode3d, onReset }: { mode3d: boolean; setMode3
         ))}
       </div>
       <button onClick={onReset} className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-muted hover:text-text">
-        <RotateCcw size={13} />Reset view
+        <RotateCcw size={13} /><span className="max-md:sr-only">Reset view</span>
       </button>
     </>
   )
