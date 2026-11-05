@@ -5,7 +5,7 @@ Living file. Updated at the end of every phase. Three parts:
 2. **Decisions made** (answered by Monset, with date).
 3. **Assumptions** we made about process and data, so nothing assumed gets mistaken for confirmed.
 
-Last updated: 2026-11-05 (Phase 3)
+Last updated: 2026-11-05 (Phase 4)
 
 ---
 
@@ -35,6 +35,12 @@ Last updated: 2026-11-05 (Phase 3)
 | Q21 | Target vs actual | Manila's month-over-month chart: is "target" the POs whose PTL target PAT falls in the month, and "actual" the PATs accepted in that month (regardless of when they were due)? | Yes to both. We also split actual into on time vs late. |
 | Q22 | Milestone progress | Is portfolio milestone progress a simple average per PO, or weighted by cost or route length? | Simple average per PO; completed POs count as 100%. Plan line is the average PTL-planned % for today. |
 | Q23 | Health score | Does the client want a single 0-100 schedule health number, and is our formula acceptable? | 100 minus points behind plan, minus contractor-attributable late days (max 50). |
+| Q24 | Crew phones | Do crews have company phones (Android / iPhone), mobile data, and can we require camera + location permission? | Any modern phone browser; installable as an app (PWA). Works offline, syncs when there is signal. |
+| Q25 | Who submits | Only crew leads, or any lineman? Does a Backbone PM approve progress before it counts? | Crew lead submits; progress counts as soon as it syncs. No approval step yet. |
+| Q26 | GPS rule | Should a GPS fix far from the PO route block the update, or only flag it? What distance? | Flag only, above 500 m. With no device GPS, the crew can place it on the route; that is flagged too. |
+| Q27 | Undertaking text | Exact legal wording of the Incident Acknowledgment and Undertaking, and is an e-signature on a phone acceptable? | Placeholder wording, clearly marked. Finger signature on the crew's phone or on the party's own phone via QR. |
+| Q28 | BOM rates | Is there a standard rate card for restoration items, and who prepares/approves the BOM (MSP, PM, PMO)? | Office fills the BOM from a preset list with editable unit costs. |
+| Q29 | Blockers | Who closes a blocker: the crew, or the Backbone PM? Can a blocker be back-dated? | Crew taps "Cleared today". Start date can be back-dated, not future-dated. |
 | Q20 | Map provider | Is a free OpenStreetMap basemap acceptable for production, or does Converge have a licensed basemap / GIS server? | OpenFreeMap (no API key), with attribution shown. |
 
 ## 2. Decisions made
@@ -113,3 +119,16 @@ All data is invented. Nothing comes from Converge or any real contractor.
 - **Chart series:** "Due" is a deliberately muted reference; accepted on time = violet, accepted late = orange (validated for colour-vision separation and contrast in both themes). Every chart has a "View as table".
 - **Map intro and KPI count-up play once per browser session.** Coming back to the Command Center (or arriving via "Show on map") goes straight to the map.
 - **Theme switch** reveals the new theme as a circle from the toggle (adapted from Skiper UI skiper26, free component; attribution required, will go in the README credits).
+
+### Field App and Incidents (Phase 4)
+
+- **The "server" is mocked.** The outbox (IndexedDB on the phone) sends items in order after a ~1 s delay into the local repository, which replays them over the seed on every load. Nothing leaves the browser. With Supabase this becomes a real upload.
+- Consequence for the demo: **the QR signing page only works in the same browser** (e.g. open it from the incident screen). On a real backend the responsible party's own phone would sign.
+- **Photos** are compressed to ~1280 px JPEG on the phone and stored in the outbox as data. "Add a sample photo (demo)" and "Use route point (demo)" exist so the flow works on a laptop with no camera or GPS; both are visible in the data (sample photo / `gpsSource: route-demo`).
+- **Progress updates take effect when synced**: milestone %, actual start date (first update above 0%) and actual end date (first update at 100%).
+- **Blockers are tagged at the source** with a reason code; the form says immediately whether it is subject to LD. An excused blocker moves the target from its start date until it is cleared.
+- **Incidents filed from the phone** are pre-filled from the crew (witnessing MSP, attending personnel), the PO and its route (affected link, fault location), with GPS and time. BOM is left empty for the office; permanent restoration defaults to "still for award".
+- **Seed incidents** marked "undertaking signed" are treated as signed on paper.
+- **Demo switches** in the crew app: switch crew, and "Simulate no signal". The real network state is also respected.
+- **Installable app (PWA)**: opens at `/field`, the app shell is cached so it starts with no signal (verified in a browser with the network cut).
+- Motion: slide to confirm on every field submit (no accidental sends with gloves or in a pocket), a drawn check on success, spring bottom sheets.

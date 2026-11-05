@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Route, Routes } from 'react-router'
+import { Route, Routes, useLocation } from 'react-router'
 import { Moon, Sun } from 'lucide-react'
 import { useData } from './state'
 import { NavTabs, type Tab } from './ui/NavTabs'
@@ -8,6 +8,9 @@ import { CommandCenter } from './screens/command/CommandCenter'
 import { Portfolio } from './screens/portfolio/Portfolio'
 import { PoDetail } from './screens/po/PoDetail'
 import { revealTheme } from './ui/skiper/themeReveal'
+import { FieldPage } from './screens/field/FieldApp'
+import { Incidents } from './screens/incidents/Incidents'
+import { Ack } from './screens/incidents/Ack'
 
 const TABS: Tab[] = [
   { to: '/', label: 'Command Center' },
@@ -22,20 +25,25 @@ const TABS: Tab[] = [
 const COMING: Record<string, { phase: number; what: string }> = {
   '/scorecards': { phase: 5, what: 'On-time rate, attributable delay share, documentation lateness, LD exposure and trend per contractor.' },
   '/month-end': { phase: 5, what: 'Guided Day 1 to Day 10 close: fallout list, pre-drafted gap analyses, LD recommendations and notices, contractor acknowledgment.' },
-  '/incidents': { phase: 4, what: 'Third-party damage claims: incident report, undertaking, optional blotter, and BOM for temporary and permanent restoration.' },
-  '/field': { phase: 4, what: 'Offline-first crew app: my POs, photo-proof updates with GPS and time, blockers with reason codes, incident reports.' },
   '/settings': { phase: 5, what: 'Delay reason codes, milestone weights, risk thresholds, LD rate and cap, holidays.' },
 }
 
 export default function App() {
+  const { pathname } = useLocation()
+  // The signing page is for an outside party: no internal navigation.
+  if (pathname.startsWith('/ack/')) return <main className="h-full overflow-y-auto"><Routes><Route path="/ack/:id" element={<Ack />} /></Routes></main>
   return (
     <div className="flex h-full flex-col">
-      <Header />
+      {/* On a phone the Field App is the whole screen. */}
+      <div className={pathname.startsWith('/field') ? 'max-md:hidden' : ''}><Header /></div>
       <main className="min-h-0 flex-1 overflow-y-auto">
         <Routes>
           <Route index element={<CommandCenter />} />
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/po/:id" element={<PoDetail />} />
+          <Route path="/field" element={<FieldPage />} />
+          <Route path="/incidents" element={<Incidents />} />
+          <Route path="/incidents/:id" element={<Incidents />} />
           {Object.entries(COMING).map(([path, c]) => (
             <Route key={path} path={path} element={<Coming title={TABS.find(t => t.to === path)!.label} {...c} />} />
           ))}
@@ -49,7 +57,7 @@ export default function App() {
 function Header() {
   const { theme, setTheme } = useData()
   return (
-    <header className="relative z-30 flex items-center gap-4 border-b border-border bg-bg px-4 md:px-6">
+    <header className="app-chrome relative z-30 flex items-center gap-4 border-b border-border bg-bg px-4 md:px-6">
       <a href="/" className="flex shrink-0 items-center gap-2.5 py-3" aria-label="Converge-J Fiber Backbone Command, home">
         <BrandMark />
         <span className="hidden leading-tight sm:block">

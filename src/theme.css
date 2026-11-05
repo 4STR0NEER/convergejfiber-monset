@@ -131,3 +131,12 @@ input, textarea { caret-color: var(--brand-orange); }
 
 /* Theme reveal (see ui/skiper/themeReveal.ts): disable the default cross-fade, the circle does the work. */
 ::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+
+/* Claim packet / reports: print the content, not the app chrome. */
+@media print {
+  :root { --bg: #fff; --surface: #fff; --surface-2: #f3f3f3; --text: #000; --muted: #444; --border: #ccc; color-scheme: light; }
+  .app-chrome, .no-print { display: none !important; }
+  main { overflow: visible !important; }
+  html, body, #root { height: auto; }
+  section, article { break-inside: avoid; }
+}

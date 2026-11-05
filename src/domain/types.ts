@@ -76,6 +76,11 @@ export interface FieldUpdate {
   gps: LngLat
   at: Timestamp
   note?: string
+  /** Where the fix came from. 'route-demo' = no device GPS, placed on the route (flagged to the office). */
+  gpsSource?: 'device' | 'route-demo'
+  gpsAccuracyM?: number
+  /** km from the PO's drawn route at submit time (proof check). */
+  distanceToRouteKm?: number
 }
 
 export interface Crew {
@@ -108,6 +113,11 @@ export interface Incident {
   blotterAttached: boolean
   bom: BomLine[]
   permanentRestoration: 'same-contractor' | 'for-award'
+  photoIds?: string[]
+  /** Signed Incident Acknowledgment and Undertaking (on the crew's phone or via the QR link). */
+  undertaking?: { name: string; position: string; signature: string; at: Timestamp; via: 'crew-phone' | 'qr-link' }
+  blotterPhotoId?: string
+  reportedByCrew?: string
 }
 
 export interface Settings {

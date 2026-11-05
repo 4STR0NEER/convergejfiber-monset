@@ -1,9 +1,11 @@
 // Data access seam. UI only talks to `Repository`; swap LocalRepo for a SupabaseRepo later.
+import { get, set } from 'idb-keyval'
 import { DEFAULT_SETTINGS } from '../domain/config'
+import { applySubmission, type Submission } from '../domain/field'
 import { todayManila } from '../domain/dates'
 import { pointAlong } from '../domain/geo'
 import { weightedProgress } from '../domain/status'
-import type { LngLat, Network, Settings, Snapshot } from '../domain/types'
+import type { Incident, LngLat, Network, Settings, Snapshot } from '../domain/types'
 import { generateSeed } from './seed'
 import networkJson from './network.geo.json'
 
@@ -12,7 +14,14 @@ export interface Repository {
   getNetwork(): Promise<Network>
   getSettings(): Promise<Settings>
   saveSettings(s: Settings): Promise<void>
+  /** A field submission that reached the server (after the outbox synced it). */
+  submit(sub: Submission): Promise<Snapshot>
+  /** Office edits to an incident (BOM, award, undertaking). */
+  saveIncident(i: Incident): Promise<Snapshot>
 }
+
+// ponytail: local "server" = IndexedDB log replayed over the deterministic seed. Supabase replaces it.
+const APPLIED_KEY = 'cjf.applied.v1'
 
 const SETTINGS_KEY = 'cjf.settings.v1'
 
@@ -44,6 +53,14 @@ export class LocalRepo implements Repository {
 
   async getNetwork() { return this.network }
 
+  async submit(sub: Submission) {
+    const log = ((await get<Submission[]>(APPLIED_KEY).catch(() => undefined)) ?? []).concat(sub)
+    await set(APPLIED_KEY, log).catch(() => { /* kept in memory only */ })
+    return (this.snap = applySubmission(await this.getSnapshot(), sub))
+  }
+
+  async saveIncident(incident: Incident) { return this.submit({ kind: 'incident', incident }) }
+
   async getSnapshot() {
     if (this.snap) return this.snap
     const snap = generateSeed({ asOf: todayManila(), nowMs: Date.now() })
@@ -63,7 +80,8 @@ export class LocalRepo implements Repository {
       const s = i.poId ? seg.get(i.poId) : undefined
       if (s) i.gps = pointAlong(s.path, 0.55)
     }
-    return (this.snap = snap)
+    const log = (await get<Submission[]>(APPLIED_KEY).catch(() => undefined)) ?? []
+    return (this.snap = log.reduce(applySubmission, snap))
   }
 
   async getSettings(): Promise<Settings> {

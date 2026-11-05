@@ -23,6 +23,8 @@ interface Data {
   select: (id: string | null) => void
   theme: Theme
   setTheme: (t: Theme) => void
+  /** Swap in a newer snapshot after a write (sync, incident edit). */
+  setSnap: (s: Snapshot) => void
 }
 
 const Ctx = createContext<Data | null>(null)
@@ -69,6 +71,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return {
       ...loaded, evals, byId: new Map(evals.map(e => [e.po.id, e])),
       filters, setFilters, matchesScope, matches, selectedId, select, theme, setTheme,
+      setSnap: (snap: Snapshot) => setLoaded(l => (l ? { ...l, snap } : l)),
     }
   }, [loaded, filters, selectedId, theme])
 

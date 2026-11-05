@@ -7,7 +7,7 @@ import { useData } from '../../state'
 import { ago } from '../../ui/format'
 import LiquidGauge from '../../ui/kokonut/liquid-gauge'
 import { Panel } from '../../ui/Panel'
-import { photoUrl } from '../../ui/photo'
+import { photoSrc as photoUrl } from '../../ui/photo'
 import { StatusBadge } from '../../ui/status'
 
 export function PoDetail() {

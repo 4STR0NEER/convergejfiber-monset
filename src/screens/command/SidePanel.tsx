@@ -8,7 +8,7 @@ import { currentPtl, MILESTONE_LABEL, MILESTONES } from '../../domain/types'
 import { useData } from '../../state'
 import LiquidGauge from '../../ui/kokonut/liquid-gauge'
 import { ago } from '../../ui/format'
-import { photoUrl } from '../../ui/photo'
+import { photoSrc as photoUrl } from '../../ui/photo'
 import { StatusBadge } from '../../ui/status'
 
 export function SidePanel({ ev }: { ev: PoEval }) {
