@@ -36,6 +36,8 @@ interface Data {
   accounts: Session[]
   signIn: (email: string, password: string) => Session | null
   signOut: () => void
+  /** Reload data and routes from the repository after an office edit (new PO, nodes). */
+  refresh: () => Promise<void>
 }
 
 const Ctx = createContext<Data | null>(null)
@@ -97,6 +99,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       session, accounts, can: (a: Action) => canDo(session, a),
       signIn: (email: string, password: string) => { const s = auth.signIn(email, password, accounts); if (s) { reset(); setSession(s) } return s },
       signOut: () => { auth.signOut(); reset(); setSession(null) },
+      refresh: async () => { const [snap, network] = await Promise.all([repo.getSnapshot(), repo.getNetwork()]); setLoaded(l => (l ? { ...l, snap, network } : l)) },
       filters, setFilters, matchesScope, matches, selectedId, select, theme, setTheme,
       setSnap: (snap: Snapshot) => setLoaded(l => (l ? { ...l, snap } : l)),
       setSettings: (settings: Settings) => { setLoaded(l => (l ? { ...l, settings } : l)); repo.saveSettings(settings) },

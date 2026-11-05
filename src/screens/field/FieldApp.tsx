@@ -110,7 +110,7 @@ export function FieldApp({ within }: { within?: HTMLElement | null }) {
         </div>
       </header>
 
-      <main className="px-4 pt-4">
+      <section aria-label="My POs" className="px-4 pt-4">
         <h2 className="text-lg font-semibold tracking-tight">My POs</h2>
         <p className="text-xs text-muted">
           {mine.length} assigned{lastSent ? ` · last sent ${ago(lastSent, now)}` : ''}{!online && ' · working offline'}
@@ -151,7 +151,7 @@ export function FieldApp({ within }: { within?: HTMLElement | null }) {
             )
           })}
         </ul>
-      </main>
+      </section>
 
       <button onClick={() => setSheet('actions')} aria-label="Report"
         className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-5 z-20 flex h-14 items-center gap-2 rounded-full px-5 text-[15px] font-semibold text-white shadow-[var(--shadow)] md:absolute"
@@ -177,8 +177,8 @@ export function FieldApp({ within }: { within?: HTMLElement | null }) {
           {[...items].reverse().map(i => (
             <li key={i.id} className="flex items-center justify-between gap-3 py-2.5">
               <span className="min-w-0">
-                <span className="block truncate font-medium">{i.sub.kind === 'update' ? `Update ${MILESTONE_LABEL[i.sub.update.milestone]} ${i.sub.update.progress}%` : i.sub.kind === 'blocker' ? `Blocker ${i.sub.delay.end ? 'cleared' : 'reported'}: ${i.sub.delay.reasonCode}` : `Incident ${i.sub.incident.id}`}</span>
-                <span className="text-xs text-muted">{i.sub.kind === 'update' ? i.sub.update.poId : i.sub.kind === 'blocker' ? i.sub.delay.poId : i.sub.incident.poId} · saved {ago(i.createdAt, now)}</span>
+                <span className="block truncate font-medium">{i.sub.kind === 'update' ? `Update ${MILESTONE_LABEL[i.sub.update.milestone]} ${i.sub.update.progress}%` : i.sub.kind === 'blocker' ? `Blocker ${i.sub.delay.end ? 'cleared' : 'reported'}: ${i.sub.delay.reasonCode}` : i.sub.kind === 'incident' ? `Incident ${i.sub.incident.id}` : `New ${i.sub.po.kind} ${i.sub.po.id}`}</span>
+                <span className="text-xs text-muted">{i.sub.kind === 'update' ? i.sub.update.poId : i.sub.kind === 'blocker' ? i.sub.delay.poId : i.sub.kind === 'incident' ? i.sub.incident.poId : i.sub.po.id} · saved {ago(i.createdAt, now)}</span>
               </span>
               <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${i.status === 'sent' ? 'bg-surface-2 text-muted' : i.status === 'failed' ? 'text-bad' : 'text-[var(--st-atrisk)]'}`}>
                 {i.status === 'sent' ? 'Sent' : i.status === 'sending' ? 'Sending…' : i.status === 'failed' ? 'Failed, will retry' : 'Waiting for signal'}

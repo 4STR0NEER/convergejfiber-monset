@@ -24,6 +24,8 @@ export type Action =
   | 'incident.award'     // decide if permanent restoration is awarded or for award
   | 'field.submit'       // send updates, blockers, damage reports
   | 'field.switchCrew'   // act as another crew in the Field App
+  | 'po.create'          // add a PO / WO with its PTL and route
+  | 'network.edit'       // add, rename or remove network nodes
 
 const RULES: Record<Action, Role[]> = {
   'settings.edit': ['admin'],
@@ -33,6 +35,8 @@ const RULES: Record<Action, Role[]> = {
   'incident.award': ['admin'],
   'field.submit': ['admin', 'manager', 'ground'],
   'field.switchCrew': ['admin', 'manager'],
+  'po.create': ['admin'],
+  'network.edit': ['admin'],
 }
 export const can = (s: Session | null, a: Action) => !!s && RULES[a].includes(s.role)
 

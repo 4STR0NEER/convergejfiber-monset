@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { repo } from '../../data/repo'
 import { importRoutes } from '../../data/importRoutes'
+import { NetworkNodes } from './NetworkNodes'
 import type { Network } from '../../domain/types'
 import { Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { DEFAULT_SETTINGS } from '../../domain/config'
@@ -128,6 +129,7 @@ export function SettingsPage() {
       </Panel>
 
       <RouteData />
+      <NetworkNodes />
 
       <Panel className="mt-4" title="Holidays" sub="Skipped when counting month-end Day 1 to Day 10">
         <ul className="flex flex-wrap gap-2 text-[13px]">

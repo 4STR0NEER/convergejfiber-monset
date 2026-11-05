@@ -5,7 +5,7 @@ Living file. Updated at the end of every phase. Three parts:
 2. **Decisions made** (answered by Monset, with date).
 3. **Assumptions** we made about process and data, so nothing assumed gets mistaken for confirmed.
 
-Last updated: 2026-11-06 (sign-in and roles)
+Last updated: 2026-11-06 (adding POs and nodes)
 
 ---
 
@@ -53,6 +53,9 @@ Last updated: 2026-11-06 (sign-in and roles)
 | Q38 | Contractor visibility | May contractor managers see their LD exposure live, before a notice is issued? May they see anonymised benchmarks against other MSPs? | They see their own live LD and scorecard; nothing about other contractors. |
 | Q39 | Ground accounts | Does every lineman get an account, or only crew leads? Can one phone be shared by a crew? | One account per crew lead. A shared phone keeps its unsent outbox across sign-ins. |
 | Q40 | Accounts | Who creates and removes accounts (contractor staff change often)? Should Converge staff sign in with Google Workspace or Microsoft? | Demo accounts only. Live: admin invites users; SSO for Converge staff, email + password for contractors. |
+| Q41 | PO entry | Should new POs be typed in by PMO, or flow in from SAP / the PO system? Who is allowed to create them? | Admins add them by hand (PO number, program, cluster, category, contractor, cost, PTL, route, crew). A SAP import can replace this. |
+| Q42 | Changing POs | Who may change a PO after it is created (cost variation, new PTL, contractor change, cancellation)? | Not built yet. A PTL change should create a new PTL version, never overwrite the signed one. |
+| Q43 | Node types | Beyond the core node / NOC and hubs, which network points matter on the map (OLTs, ODFs, splice closures, handholes)? | Two types: core node / NOC and hub. |
 
 ## 2. Decisions made
 
@@ -69,6 +72,7 @@ Last updated: 2026-11-06 (sign-in and roles)
 | 2026-11-05 | Command Center defaults to the **dark** theme; light theme via toggle (remembered per browser). |
 | 2026-11-05 | "Wedge" and "fluid" motion goes on the **main nav tabs**. Motion Studio not installed. |
 | 2026-11-06 | **Three roles**: Admin (Converge-J Fiber), Contractor manager (one MSP), Ground team (Field App, own crew). |
+| 2026-11-06 | **Admins can add POs and network nodes** in the app (no file needed). |
 | 2026-11-06 | On phones the Command Center opens as a **list, not the map**: people on the go should not have to pinch and pan. The map is one tap away. |
 
 ## 3. Assumptions
@@ -181,3 +185,13 @@ All data is invented. Nothing comes from Converge or any real contractor.
 - A screen a role may not open sends the user to their home screen. A deep link opened while signed out returns to that page after sign-in if the role allows it.
 - The QR signing page for responsible parties needs no account.
 - The Field App's offline outbox belongs to the phone, not the user: items waiting to send survive sign-out and go out after the next sign-in (so nothing typed in the field is lost).
+
+### Adding POs and nodes (2026-11-06)
+
+- **Admins only.** Contractor managers and the ground team cannot add or change POs or nodes.
+- A new PO / WO gets **PTL version 1 signed on the day it is entered**, the standard milestone split (editable), **0% progress** and status from the usual rules (it shows as Not Started until a crew reports progress).
+- The suggested number is the next free one (10-digit PO, or WO-SR-YY-NNNN for SUNRISE); it can be overwritten and must be unique.
+- **Route length** is measured from the route drawn on the map; without a drawing it can be typed in. The route can also come later from a KMZ.
+- **Assigning a crew** puts the PO in that crew's Field App straight away.
+- Drawn routes and node changes are kept **as edits on top of the loaded route file**, so importing the real routes later does not lose them. Map labels use each node's own name.
+- Editing or cancelling an existing PO is not built yet (Q42).

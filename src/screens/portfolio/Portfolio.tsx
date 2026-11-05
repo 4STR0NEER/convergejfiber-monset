@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
+import { Plus } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ArrowDown, ArrowUp, Check, Search, TriangleAlert } from 'lucide-react'
 import { fmtDate, peso } from '../../domain/dates'
@@ -16,7 +17,7 @@ const MONTH = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'O
 const monthLabel = (p: string) => `${MONTH[+p.slice(5) - 1]} ${p.slice(2, 4)}`
 
 export function Portfolio() {
-  const { snap, evals, matches } = useData()
+  const { snap, evals, matches, can } = useData()
   const view = useMemo(() => evals.filter(matches), [evals, matches])
   const cost = sumPhp(view.map(e => e.po.costOfWorks))
 
@@ -29,7 +30,10 @@ export function Portfolio() {
             {view.length} POs/WOs · {pesoShort(cost)} cost of works · as of {fmtDate(snap.asOf)}
           </p>
         </div>
-        <ReconcileChip view={view} />
+        <div className="flex items-center gap-2">
+          <ReconcileChip view={view} />
+          {can('po.create') && <Link to="/po/new" className="inline-flex items-center gap-1.5 rounded-full bg-text px-3.5 py-1.5 text-xs font-semibold text-bg"><Plus size={14} />New PO</Link>}
+        </div>
       </div>
       <FilterBar />
       <div className="grid gap-4 p-4 md:grid-cols-2 md:p-6 xl:grid-cols-12">

@@ -14,6 +14,7 @@ import { revealTheme } from './ui/skiper/themeReveal'
 const CommandCenter = lazy(() => import('./screens/command/CommandCenter').then(m => ({ default: m.CommandCenter })))
 const Portfolio = lazy(() => import('./screens/portfolio/Portfolio').then(m => ({ default: m.Portfolio })))
 const PoDetail = lazy(() => import('./screens/po/PoDetail').then(m => ({ default: m.PoDetail })))
+const NewPo = lazy(() => import('./screens/po/NewPo').then(m => ({ default: m.NewPo })))
 const FieldPage = lazy(() => import('./screens/field/FieldApp').then(m => ({ default: m.FieldPage })))
 const Incidents = lazy(() => import('./screens/incidents/Incidents').then(m => ({ default: m.Incidents })))
 const Ack = lazy(() => import('./screens/incidents/Ack').then(m => ({ default: m.Ack })))
@@ -51,6 +52,7 @@ export default function App() {
         <Routes>
           <Route index element={<CommandCenter />} />
           <Route path="/portfolio" element={<Portfolio />} />
+          <Route path="/po/new" element={<NewPo />} />
           <Route path="/po/:id" element={<PoDetail />} />
           <Route path="/field" element={<FieldPage />} />
           <Route path="/incidents" element={<Incidents />} />

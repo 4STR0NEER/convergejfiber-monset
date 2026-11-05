@@ -26,12 +26,13 @@ The seed is deterministic (fixed random seed) and its dates are relative to toda
 |---|---|
 | `/` **Command Center** | 3D map of Metro Cebu (deck.gl over MapLibre): network coloured by status with dash patterns and glyphs, pulse along active work, crews at their last check-in, third-party damage, the NOC pin. Click a line (or use **Find a PO**) to fly there and open the PO panel. KPI strip, shared filters, 2D fallback. |
 | `/portfolio` | Milestone progress vs plan, target vs actual PAT month over month, status by cluster and category, LD by program, contractor ranking, searchable PO register. Live reconciliation check. |
+| `/po/new` | **Add a PO / WO** (admin): program, cluster, category, contractor, cost of works, PTL dates with an editable milestone split, route drawn by clicking on a map (length measured from it), optional crew. |
 | `/po/:id` | PTL baseline vs actual Gantt (with rebaseline ghosts), field update feed with photo proof, LD day strip and formula, delay log, milestone and PTL history. |
 | `/scorecards` | Contractors ranked worst first: on-time rate, their share of delay, late documentation, LD exposure, trend; delay days by reason. |
 | `/month-end` | Guided Day 0 → Day 10 close: declarations, late docs, auto fallout list, pre-drafted gap analyses, LD recommendations with waivers, printable memo and claim notices, acknowledgment tracking. |
 | `/incidents` | Third-party damage claims: report, signed undertaking (or QR for the responsible party to sign), BOM with temporary/permanent totals, award flag, printable claim packet. |
 | `/field` | Crew app (installable PWA, works offline): my POs, proof-first progress updates, blockers with reason codes, damage reports. On desktop it shows inside a phone frame. |
-| `/settings` | LD rate and cap, risk thresholds, milestone weights, reason codes, holidays, brand colours, **route data import**, with a live what-if before saving. |
+| `/settings` | LD rate and cap, risk thresholds, milestone weights, reason codes, holidays, brand colours, **route data import**, **network nodes** (add by clicking the map, rename, remove), with a live what-if before saving. |
 | `/ack/:id` | Page the responsible party opens from the QR code to sign the Incident Acknowledgment and Undertaking (no account needed). |
 
 ## Business rules
@@ -63,6 +64,10 @@ src/
 scripts/build-network.ts   regenerates the assumed network.geo.json
 ```
 
+## Adding POs and nodes by hand
+
+Admins can add work without a file: **Portfolio → New PO** creates a PO / WO with PTL version 1 (signed today), milestones split the standard way (Engineering 0-20%, ROW 10-45%, Civil 35-80%, FOC 60-100% of the PTL, all editable), 0% progress, an optional drawn route and an optional crew. It appears at once on the map, in every total and in that crew's Field App. **Settings → Network nodes** adds a core node / NOC or hub by clicking its location. Drawn routes and node edits are stored as edits on top of whichever route file is loaded, so importing real routes later keeps them. Rules: `src/domain/po.ts` (tested).
+
 ## Swapping in real route data
 
 **Without code (demo or pilot):** Settings → **Route data** → choose a `.kmz`, `.kml` or `.geojson`. The app shows how many lines matched a PO, how many lines had no PO number and how many POs have no route, then **Use these routes**. Crews and incidents are re-placed on the new lines. **Restore assumed routes** undoes it. The file is kept in the browser only.
@@ -89,7 +94,7 @@ The UI only talks to the `Repository` interface in `src/data/repo.ts`:
 ```ts
 getSnapshot(), getNetwork(), getSettings(), saveSettings(),
 submit(submission), saveIncident(incident), getClose(period), saveClose(close),
-saveNetwork(network | null), getNetworkSource()
+saveNetwork(network | null), getNetworkSource(), createPo(po, { crewId, segment }), saveHub(hub), removeHub(id)
 ```
 
 1. Write `SupabaseRepo implements Repository` and change the one line `export const repo: Repository = new LocalRepo()`. No screen changes.
@@ -140,7 +145,7 @@ The prototype signs in with **demo accounts** (password `demo1234`), listed on t
 
 | Role | Who | Sees | Can do |
 |---|---|---|---|
-| Admin | Converge-J Fiber Backbone Build / PMO (`admin@convergej.demo`) | Everything | Everything: settings and route files, run the month-end close, waive, issue notices, decide incident awards |
+| Admin | Converge-J Fiber Backbone Build / PMO (`admin@convergej.demo`) | Everything | Everything: add POs and network nodes, settings and route files, run the month-end close, waive, issue notices, decide incident awards |
 | Contractor manager | One per MSP (`pm.mcc@convergej.demo`, ...) | Only their contractor's POs, routes, crews, incidents, scorecard and LD | Edit the BOM on their incidents, acknowledge or dispute their LD notice, view their crews in the Field App. No Settings; the LD recommendation memo is internal. |
 | Ground team | Linemen / crew leads (`jun.cabahug@convergej.demo`, ...) | Field App only, their own crew | Progress updates, blockers, damage reports |
 

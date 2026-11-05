@@ -5,9 +5,7 @@ import { IconLayer, PathLayer, ScatterplotLayer, TextLayer } from '@deck.gl/laye
 import { TripsLayer } from '@deck.gl/geo-layers'
 import { PathStyleExtension, type PathStyleExtensionProps } from '@deck.gl/extensions'
 import { Map as MapGL, type MapRef } from 'react-map-gl/maplibre'
-import 'maplibre-gl/dist/maplibre-gl.css'
-import { setWorkerUrl } from 'maplibre-gl'
-import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
+import { MAP_STYLE as STYLE } from '../../ui/maplibre'
 import { animate } from 'animejs'
 import { cumulativeKm, km } from '../../domain/geo'
 import { STATUS_LABEL } from '../../domain/status'
@@ -18,13 +16,6 @@ import { useData } from '../../state'
 import { ago, pesoShort } from '../../ui/format'
 import { glyphSvg, hexToRgb, STATUS_DASH, STATUS_HEX } from '../../ui/status'
 
-// MapLibre 6 finds its worker relative to its own module, which bundlers move. Point at it explicitly.
-setWorkerUrl(workerUrl)
-
-const STYLE = {
-  dark: 'https://tiles.openfreemap.org/styles/dark',
-  light: 'https://tiles.openfreemap.org/styles/positron',
-}
 const BUILDING = { dark: '#231d36', light: '#d8d1de' }
 const NOC: LngLat = [123.9223, 10.3236]
 const HOME = { longitude: 123.905, latitude: 10.305, zoom: 12.25, pitch: 55, bearing: -28 }
@@ -226,7 +217,7 @@ export function HeroMap({ mode3d, reduceMotion, resetSignal }: Props) {
       getFillColor: theme === 'dark' ? [13, 11, 20, 255] : [255, 255, 255, 255], getLineColor: [255, 107, 26, 255],
     }),
     new TextLayer<Hub>({
-      id: 'hub-labels', data: hubs, getPosition: h => h.coord, getText: h => (h.core ? 'Mandaue NOC' : h.name.replace(/ hub$/, '')),
+      id: 'hub-labels', data: hubs, getPosition: h => h.coord, getText: h => h.name.replace(/\s*\(placeholder\)/, '').replace(/ Core \/ NOC$/, ' NOC').replace(/ hub$/, ''),
       getSize: h => (h.core ? 14 : 12), getPixelOffset: h => [0, h.core ? -66 : -18], fontFamily: 'Archivo Variable, sans-serif', fontWeight: 600,
       getColor: theme === 'dark' ? [243, 240, 247, 255] : [21, 18, 28, 255],
       background: true, getBackgroundColor: theme === 'dark' ? [13, 11, 20, 200] : [255, 255, 255, 220], backgroundPadding: [6, 3],
@@ -266,7 +257,7 @@ export function HeroMap({ mode3d, reduceMotion, resetSignal }: Props) {
       }
     }
     if (layer.id === 'noc') {
-      return { style: tipStyle, html: `<b>Mandaue core / NOC</b><div style="opacity:.8">Placeholder location until the real node list arrives.</div><div>${network.segments.filter(s => s.tier === 'mainline').length} mainline segments, ${network.segments.length} total</div>` }
+      return { style: tipStyle, html: `<b>${(object as Hub).name}</b><div style="opacity:.8">Core node / NOC${/placeholder/i.test((object as Hub).name) ? ': placeholder location until the real node list arrives' : ''}.</div><div>${network.segments.filter(s => s.tier === 'mainline').length} mainline segments, ${network.segments.length} total</div>` }
     }
     if (layer.id === 'crews') {
       const c = object as Crew

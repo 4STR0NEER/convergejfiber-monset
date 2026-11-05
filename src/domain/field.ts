@@ -1,10 +1,12 @@
 // Field submissions: what a crew sends from the phone, and how each one changes the portfolio.
 import type { ISODate } from './dates'
 import { km } from './geo'
-import type { DelayEvent, FieldUpdate, Incident, LngLat, Network, Settings, Snapshot } from './types'
+import type { DelayEvent, FieldUpdate, Incident, LngLat, Network, PO, Settings, Snapshot } from './types'
 
 export type Submission =
   | { kind: 'update'; update: FieldUpdate }
+  /** A PO / WO created by hand in the office, optionally assigned to a crew. */
+  | { kind: 'po'; po: PO; crewId?: string }
   | { kind: 'blocker'; delay: DelayEvent }
   | { kind: 'incident'; incident: Incident }
 
@@ -41,6 +43,10 @@ export function reasonImpact(code: string, s: Settings) {
 export function applySubmission(snap: Snapshot, sub: Submission): Snapshot {
   // Same id again = the blocker was updated (e.g. cleared with an end date).
   if (sub.kind === 'blocker') return { ...snap, delays: [...snap.delays.filter(d => d.id !== sub.delay.id), sub.delay] }
+  if (sub.kind === 'po') {
+    const crews = sub.crewId ? snap.crews.map(c => (c.id === sub.crewId && !c.poIds.includes(sub.po.id) ? { ...c, poIds: [...c.poIds, sub.po.id] } : c)) : snap.crews
+    return { ...snap, pos: [...snap.pos.filter(p => p.id !== sub.po.id), sub.po], crews }
+  }
   if (sub.kind === 'incident') {
     const rest = snap.incidents.filter(i => i.id !== sub.incident.id)
     return { ...snap, incidents: [...rest, sub.incident] }
