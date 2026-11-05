@@ -74,12 +74,14 @@ export function RecommendationDoc() {
 
 export function NoticeDoc() {
   const { period = '', contractorId = '' } = useParams()
-  const { snap } = useData()
+  const { snap, can } = useData()
   const data = useCloseData(period)
   const { close } = useClose(period)
   const c = snap.contractors.find(x => x.id === contractorId)
   const rec = data.recs.find(r => r.contractorId === contractorId)
   if (!c || !rec) return <p className="p-8 text-muted">No LD claim for this contractor in {periodName(period)}.</p>
+  // Contractors only see their notice once PMO has issued it.
+  if (!can('close.run') && !close.notices[contractorId]?.sentAt) return <p className="mx-auto max-w-xl px-6 py-24 text-muted">This notice has not been issued yet. It appears here once PMO issues it.</p>
   const items = rec.items.filter(i => !close.waived[i.poId])
   const total = items.reduce((a, i) => a + i.amount, 0)
   return (

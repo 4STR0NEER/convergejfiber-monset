@@ -176,7 +176,7 @@ All data is invented. Nothing comes from Converge or any real contractor.
 
 - **Sign-in is simulated** with demo accounts (password `demo1234`) and checked in the browser. It demonstrates roles; it is not security. Supabase Auth and row-level security replace it.
 - **Admin** sees and does everything. **Contractor managers** see only their contractor's POs, routes, crews, incidents and scorecard; the contractor filter disappears because there is only one. **Ground team** get only the Field App, locked to their crew.
-- Managers **can**: read their gap analyses (read-only), see and print their own LD notice, record acknowledgment or a dispute, edit the BOM on their incidents, view their crews' Field App.
+- Managers **can**: read their gap analyses (read-only), see and print their own LD notice once PMO has issued it, record acknowledgment or a dispute, edit the BOM on their incidents, view their crews' Field App.
 - Managers **cannot**: open Settings, run or mark close steps, edit gap analyses, waive, issue notices, decide whether permanent restoration is awarded, or open the internal LD recommendation memo.
 - A screen a role may not open sends the user to their home screen. A deep link opened while signed out returns to that page after sign-in if the role allows it.
 - The QR signing page for responsible parties needs no account.

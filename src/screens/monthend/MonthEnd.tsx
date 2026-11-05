@@ -74,7 +74,7 @@ export function MonthEnd() {
 
       {legacy && <p className="mt-4 rounded-xl border border-border bg-surface px-4 py-3 text-[13px] text-muted">This month was closed before the tracker went live. Lists and documents are rebuilt from the data so you can compare.</p>}
 
-      <Stepper schedule={schedule} today={today} sel={sel} onSelect={setSel} done={done} />
+      <Stepper schedule={schedule} todayKey={today >= 0 && today <= 10 ? stepOfToday : null} sel={sel} onSelect={setSel} done={done} />
 
       {!loaded ? <p className="mt-6 text-muted">Loading…</p> : (
         <div className="mt-6">
@@ -97,14 +97,14 @@ export function MonthEnd() {
   )
 }
 
-function Stepper({ schedule, today, sel, onSelect, done }: { schedule: ReturnType<typeof closeSchedule>; today: number; sel: CloseStepKey; onSelect: (k: CloseStepKey) => void; done: (k: CloseStepKey) => boolean }) {
+function Stepper({ schedule, todayKey, sel, onSelect, done }: { schedule: ReturnType<typeof closeSchedule>; todayKey: CloseStepKey | null; sel: CloseStepKey; onSelect: (k: CloseStepKey) => void; done: (k: CloseStepKey) => boolean }) {
   const { snap } = useData()
   const reduce = useReducedMotion()
   return (
     <ol className="mt-6 grid gap-2 sm:grid-cols-3 xl:grid-cols-6" aria-label="Close steps">
       {schedule.map(s => {
         const active = sel === s.key
-        const isToday = today >= s.from && today <= s.to
+        const isToday = s.key === todayKey
         const overdue = !done(s.key) && s.end < snap.asOf
         return (
           <li key={s.key} className="relative">
@@ -340,7 +340,7 @@ function Notices({ period, data, close, update }: { period: string; data: Data; 
                     )}
                   </td>
                   <td className={`${td} whitespace-nowrap text-right`}>
-                    <Link to={`/month-end/${period}/notice/${r.contractorId}`} className="mr-3 text-xs text-muted hover:text-text">Open notice</Link>
+                    {(run || n.sentAt) && <Link to={`/month-end/${period}/notice/${r.contractorId}`} className="mr-3 text-xs text-muted hover:text-text">Open notice</Link>}
                     {!n.sentAt
                       ? run && <button onClick={() => setNotice(r.contractorId, { sentAt: new Date().toISOString() })} className="inline-flex items-center gap-1 rounded-lg bg-text px-2.5 py-1 text-xs font-medium text-bg"><Send size={12} />Issue</button>
                       : !n.ack && mayAck && <>
