@@ -134,9 +134,9 @@ input, textarea { caret-color: var(--brand-orange); }
 
 /* Claim packet / reports: print the content, not the app chrome. */
 @media print {
-  :root { --bg: #fff; --surface: #fff; --surface-2: #f3f3f3; --text: #000; --muted: #444; --border: #ccc; color-scheme: light; }
+  :root, :root[data-theme] { --bg: #fff; --surface: #fff; --surface-2: #f3f3f3; --text: #000; --muted: #444; --border: #ccc; color-scheme: light; }
   .app-chrome, .no-print { display: none !important; }
   main { overflow: visible !important; }
-  html, body, #root { height: auto; }
+  html, body, #root { height: auto; background: #fff !important; }
   section, article { break-inside: avoid; }
 }

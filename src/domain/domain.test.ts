@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_SETTINGS as S } from './config'
 import { addDays, coveredDays } from './dates'
 import { computeLd } from './ld'
-import { closeDays, docsDeadline, draftGapAnalysis, falloutList, isDocsLate, ldRecommendations } from './monthEnd'
+import { closeDayIndex, closeDays, docsDeadline, docsReport, draftGapAnalysis, falloutList, isDocsLate, ldRecommendations } from './monthEnd'
 import { evaluateAll, evaluatePO, weightedProgress } from './status'
-import { milestoneSummary, monthlySeries, reconcile, scorecards, statusBy } from './metrics'
+import { delaysByReason, milestoneSummary, monthlySeries, reconcile, scorecards, statusBy } from './metrics'
 import type { DelayEvent, PO } from './types'
 import { generateSeed } from '../data/seed'
 
@@ -171,6 +171,24 @@ describe('month-end close', () => {
     expect(recs[0].total).toBe(15_000 + 10_000) // open: 21 days -> 3 wks; done: 10 days -> 2 wks
   })
 
+  it('knows which close day today is', () => {
+    expect(closeDayIndex('2026-10', S.holidays, '2026-10-30')).toBe(-1)
+    expect(closeDayIndex('2026-10', S.holidays, '2026-10-31')).toBe(0)
+    expect(closeDayIndex('2026-10', S.holidays, '2026-11-01')).toBe(0) // holiday: still Day 0
+    expect(closeDayIndex('2026-10', S.holidays, '2026-11-02')).toBe(1)
+    expect(closeDayIndex('2026-10', S.holidays, '2026-11-05')).toBe(4)
+    expect(closeDayIndex('2026-10', S.holidays, '2026-11-11')).toBe(10)
+    expect(closeDayIndex('2026-10', S.holidays, '2026-11-12')).toBe(11)
+  })
+
+  it('docs report flags late and missing as-built documentation', () => {
+    const a = po({ id: 'A', patDate: '2026-10-20', docsSubmittedAt: '2026-11-02T22:00:00+08:00' })
+    const b = po({ id: 'B', patDate: '2026-10-25', docsSubmittedAt: '2026-11-03T08:00:00+08:00' })
+    const c = po({ id: 'C', patDate: '2026-10-28' })
+    const rows = docsReport([a, b, c].map(p => evaluatePO(p, [], S, '2026-11-05')), '2026-10', S.holidays)
+    expect(rows.map(r => [r.ev.po.id, r.late, r.missing])).toEqual([['A', false, false], ['B', true, false], ['C', true, true]])
+  })
+
   it('gap analysis says no LD when fully excused', () => {
     const p = po({ id: 'P1', target: '2026-10-10', start: '2026-08-01' })
     const ev = evaluatePO(p, [delay('DPWH', '2026-09-01')], S, '2026-10-31')
@@ -215,6 +233,13 @@ describe('seed + reconciliation', () => {
   it('scorecards cover every PO once', () => {
     const cards = scorecards(snap, evals, S, asOf)
     expect(cards.reduce((a, c) => a + c.total, 0)).toBe(evals.length)
+  })
+
+  it('delay days by reason split excused from attributable', () => {
+    const rows = delaysByReason(evals)
+    expect(rows.length).toBeGreaterThan(3)
+    expect(rows.some(r => r.ldEligible) && rows.some(r => !r.ldEligible)).toBe(true)
+    for (let i = 1; i < rows.length; i++) expect(rows[i - 1].days).toBeGreaterThanOrEqual(rows[i].days)
   })
 
   it('portfolio aggregates add up', () => {

@@ -2,6 +2,7 @@
 import { get, set } from 'idb-keyval'
 import { DEFAULT_SETTINGS } from '../domain/config'
 import { applySubmission, type Submission } from '../domain/field'
+import { emptyClose, type MonthClose } from '../domain/monthEnd'
 import { todayManila } from '../domain/dates'
 import { pointAlong } from '../domain/geo'
 import { weightedProgress } from '../domain/status'
@@ -18,6 +19,8 @@ export interface Repository {
   submit(sub: Submission): Promise<Snapshot>
   /** Office edits to an incident (BOM, award, undertaking). */
   saveIncident(i: Incident): Promise<Snapshot>
+  getClose(period: string): Promise<MonthClose>
+  saveClose(c: MonthClose): Promise<void>
 }
 
 // ponytail: local "server" = IndexedDB log replayed over the deterministic seed. Supabase replaces it.
@@ -60,6 +63,14 @@ export class LocalRepo implements Repository {
   }
 
   async saveIncident(incident: Incident) { return this.submit({ kind: 'incident', incident }) }
+
+  async getClose(period: string) {
+    return (await get<MonthClose>(`cjf.close.${period}`).catch(() => undefined)) ?? emptyClose(period)
+  }
+
+  async saveClose(c: MonthClose) {
+    await set(`cjf.close.${c.period}`, c).catch(() => { /* not persisted */ })
+  }
 
   async getSnapshot() {
     if (this.snap) return this.snap

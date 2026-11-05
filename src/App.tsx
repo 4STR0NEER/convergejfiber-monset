@@ -11,6 +11,10 @@ import { revealTheme } from './ui/skiper/themeReveal'
 import { FieldPage } from './screens/field/FieldApp'
 import { Incidents } from './screens/incidents/Incidents'
 import { Ack } from './screens/incidents/Ack'
+import { MonthEnd } from './screens/monthend/MonthEnd'
+import { NoticeDoc, RecommendationDoc } from './screens/monthend/Documents'
+import { Scorecards } from './screens/scorecards/Scorecards'
+import { SettingsPage } from './screens/settings/SettingsPage'
 
 const TABS: Tab[] = [
   { to: '/', label: 'Command Center' },
@@ -21,12 +25,6 @@ const TABS: Tab[] = [
   { to: '/field', label: 'Field App' },
   { to: '/settings', label: 'Settings' },
 ]
-
-const COMING: Record<string, { phase: number; what: string }> = {
-  '/scorecards': { phase: 5, what: 'On-time rate, attributable delay share, documentation lateness, LD exposure and trend per contractor.' },
-  '/month-end': { phase: 5, what: 'Guided Day 1 to Day 10 close: fallout list, pre-drafted gap analyses, LD recommendations and notices, contractor acknowledgment.' },
-  '/settings': { phase: 5, what: 'Delay reason codes, milestone weights, risk thresholds, LD rate and cap, holidays.' },
-}
 
 export default function App() {
   const { pathname } = useLocation()
@@ -44,10 +42,14 @@ export default function App() {
           <Route path="/field" element={<FieldPage />} />
           <Route path="/incidents" element={<Incidents />} />
           <Route path="/incidents/:id" element={<Incidents />} />
-          {Object.entries(COMING).map(([path, c]) => (
-            <Route key={path} path={path} element={<Coming title={TABS.find(t => t.to === path)!.label} {...c} />} />
-          ))}
-          <Route path="*" element={<Coming title="Not found" phase={0} what="This page does not exist." />} />
+          <Route path="/month-end" element={<MonthEnd />} />
+          <Route path="/month-end/:period" element={<MonthEnd />} />
+          <Route path="/month-end/:period/recommendation" element={<RecommendationDoc />} />
+          <Route path="/month-end/:period/notice/:contractorId" element={<NoticeDoc />} />
+          <Route path="/scorecards" element={<Scorecards />} />
+          <Route path="/scorecards/:id" element={<Scorecards />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
     </div>
@@ -108,12 +110,11 @@ function LiveStamp() {
   )
 }
 
-function Coming({ title, phase, what }: { title: string; phase: number; what: string }) {
+function NotFound() {
   return (
     <section className="mx-auto max-w-xl px-6 py-24">
-      <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-      {phase > 0 && <p className="mt-1 text-sm text-accent">Arrives in Phase {phase}</p>}
-      <p className="mt-4 text-muted">{what}</p>
+      <h1 className="text-2xl font-semibold tracking-tight">Page not found</h1>
+      <p className="mt-2 text-muted">That address is not part of Backbone Command.</p>
     </section>
   )
 }

@@ -5,7 +5,7 @@ Living file. Updated at the end of every phase. Three parts:
 2. **Decisions made** (answered by Monset, with date).
 3. **Assumptions** we made about process and data, so nothing assumed gets mistaken for confirmed.
 
-Last updated: 2026-11-05 (Phase 4)
+Last updated: 2026-11-05 (Phase 5)
 
 ---
 
@@ -41,6 +41,12 @@ Last updated: 2026-11-05 (Phase 4)
 | Q27 | Undertaking text | Exact legal wording of the Incident Acknowledgment and Undertaking, and is an e-signature on a phone acceptable? | Placeholder wording, clearly marked. Finger signature on the crew's phone or on the party's own phone via QR. |
 | Q28 | BOM rates | Is there a standard rate card for restoration items, and who prepares/approves the BOM (MSP, PM, PMO)? | Office fills the BOM from a preset list with editable unit costs. |
 | Q29 | Blockers | Who closes a blocker: the crew, or the Backbone PM? Can a blocker be back-dated? | Crew taps "Cleared today". Start date can be back-dated, not future-dated. |
+| Q30 | Close roles | Who performs each close step in the system (MSP, build team, PMO, Backbone PM, Backbone Build), and does any step need a second person to approve? | One demo user can mark any step done; who and when is recorded. |
+| Q31 | Waivers | Who may waive LD on a fallout PO, and does a waiver need PMO approval? | A PM can waive with a written reason; it shows struck through on the recommendation. |
+| Q32 | Notices | How are LD notices delivered today (email, printed letter, portal)? Should contractors acknowledge inside the system? | Printable notice per contractor; PMO records who acknowledged and when, or a dispute reason. |
+| Q33 | Claim amount date | Is the LD on a notice computed as of month end, or as of the date the notice is issued? | As of month end (open POs keep accruing and appear again next month). |
+| Q34 | Finance | Is claimed LD deducted from the contractor's next payment? Should the system hand off to finance/SAP? | Out of scope; the notice is the hand-off. |
+| Q35 | Settings access | Who may change LD rate, cap, reason codes and weights? Is an audit trail needed? | Any user can change them; changes apply to every screen at once. No audit trail yet. |
 | Q20 | Map provider | Is a free OpenStreetMap basemap acceptable for production, or does Converge have a licensed basemap / GIS server? | OpenFreeMap (no API key), with attribution shown. |
 
 ## 2. Decisions made
@@ -132,3 +138,15 @@ All data is invented. Nothing comes from Converge or any real contractor.
 - **Demo switches** in the crew app: switch crew, and "Simulate no signal". The real network state is also respected.
 - **Installable app (PWA)**: opens at `/field`, the app shell is cached so it starts with no signal (verified in a browser with the network cut).
 - Motion: slide to confirm on every field submit (no accidental sends with gloves or in a pocket), a drawn check on success, spring bottom sheets.
+
+### Month-End Close, Scorecards, Settings (Phase 5)
+
+- **The current close** is the previous month's (on 5 Nov the October close, Day 4). Day numbers count calendar days after month end, skipping the holiday list.
+- **Months closed before the tracker existed** are shown as done, with lists and documents rebuilt from the data for comparison.
+- **Everything in a close is evaluated as of the period's last day** (status, fallout, LD). Gap-analysis drafts use the latest field update even if it came after month end, because PMs write them on Day 4-5.
+- **Fallout POs may end up with no LD** when excused days cover the whole slip; they still appear (Manila would have flagged them) with "No LD" and the reason in the draft.
+- **Close progress is saved per period** in the browser (IndexedDB): step done times, edited gap analyses, reviewed flags, waivers, notices issued, acknowledgments and disputes.
+- **Documents** (LD recommendation to PMO, notice per contractor) are print-ready pages; "Print or save as PDF" uses the browser. Wording is a placeholder for legal review.
+- **Scorecards**: on-time rate, their share of delay, docs late rate, LD exposure, status mix, and on-time trend over the last three complete months; detail shows delay days by reason (contractor side vs excused), six months of accepted on time vs late, and open POs.
+- **Settings** apply to every screen when saved and are stored in the browser. A live what-if shows how Trending Late / At Risk / Delayed counts and LD exposure would change before saving. Weights must total 100.
+- **Franchise brand colours** are editable in Settings (three CSS variables drive the whole brand gradient).

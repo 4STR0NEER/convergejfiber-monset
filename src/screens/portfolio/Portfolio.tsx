@@ -48,7 +48,7 @@ export function Portfolio() {
         <Panel className="xl:col-span-4" title="LD exposure by program" sub="Contractor-attributable delay only, still open or not yet claimed">
           <LdByProgram view={view} />
         </Panel>
-        <Panel className="xl:col-span-8" title="Contractors" sub="Ranked by LD exposure. Full scorecards arrive in Phase 5.">
+        <Panel className="xl:col-span-8" title="Contractors" sub={<>Ranked by LD exposure · <Link to="/scorecards" className="text-accent hover:underline">full scorecards</Link></>}>
           <ContractorTable view={view} />
         </Panel>
         <Panel className="md:col-span-2 xl:col-span-12" title="PO register" sub="Every PO/WO in this view. Open one for the full timeline, update feed and LD breakdown.">

@@ -133,6 +133,8 @@ export interface Settings {
   reasons: DelayReason[]
   /** Holidays skipped when counting month-end Day 1..10. */
   holidays: ISODate[]
+  /** Franchise brand colours (the gradient runs orange -> magenta -> violet). */
+  brand?: { orange: string; magenta: string; violet: string }
 }
 
 export type Status = 'COMPLETED' | 'ON_TRACK' | 'TRENDING_LATE' | 'AT_RISK' | 'DELAYED'

@@ -75,14 +75,14 @@ export function draftGapAnalysis(item: FalloutItem, updates: FieldUpdate[], s: S
   const po = ev.po, ld = ev.ld
   const lines = [
     `${po.kind} ${po.id} (${po.title}) missed its target PAT of ${fmtDate(ld.baseTarget)}${item.completedLate ? `; PAT accepted ${fmtDate(po.patDate!)}` : '; still open at month end'}.`,
-    `Progress at month end: ${MILESTONES.map(k => `${MILESTONE_LABEL[k]} ${Math.round(po.progress[k])}%`).join(', ')}.`,
+    `Progress now: ${MILESTONES.map(k => `${MILESTONE_LABEL[k]} ${Math.round(po.progress[k])}%`).join(', ')}.`,
   ]
   for (const p of ld.periods) {
     lines.push(`Delay: ${p.label}, ${fmtDate(p.start)} to ${fmtDate(p.end)} (${p.days} days, ${p.ldEligible ? 'contractor attributable' : 'excused, not subject to LD'}).`)
   }
   if (ld.eotDays) lines.push(`${ld.eotDays} excused days extend the target to ${fmtDate(ld.effectiveTarget)}.`)
   const last = updates.filter(u => u.poId === po.id).sort((a, b) => b.at.localeCompare(a.at))[0]
-  if (last) lines.push(`Last field update ${fmtDate(last.at.slice(0, 10))}: ${MILESTONE_LABEL[last.milestone]} at ${last.progress}%${last.note ? `, "${last.note}"` : ''}.`)
+  if (last) lines.push(`Last field update ${fmtDate(last.at.slice(0, 10))}: ${MILESTONE_LABEL[last.milestone]} at ${last.progress}%${last.note ? `, "${last.note.replace(/\.$/, '')}"` : ''}.`)
   lines.push(ld.amount > 0
     ? `Recommendation: apply LD of ${peso(ld.amount)} (${ld.lateDays} attributable days, ${ld.weeks} week${ld.weeks > 1 ? 's' : ''} at ${s.ldRatePerWeek * 100}%${ld.capped ? ', capped' : ''}).`
     : 'Recommendation: no LD. The delay is fully covered by excused reasons.')
@@ -103,3 +103,35 @@ export function ldRecommendations(fallout: FalloutItem[]): LdRecommendation[] {
   }
   return [...map.values()].sort((a, b) => b.total - a.total)
 }
+
+/** Which close day `today` is for this period: -1 before month end, 0..10 during the close, 11 after Day 10. */
+export function closeDayIndex(period: string, holidays: ISODate[], today: ISODate) {
+  const days = closeDays(period, holidays)
+  if (today < days[0]) return -1
+  if (today > days[10]) return 11
+  let i = 0
+  while (i < 10 && days[i + 1] <= today) i++
+  return i
+}
+
+export interface DocsRow { ev: PoEval; deadline: string; late: boolean; missing: boolean }
+
+/** POs accepted in the period and whether their as-built docs beat the Day 1 midnight cutoff. */
+export function docsReport(evals: PoEval[], period: string, holidays: ISODate[]): DocsRow[] {
+  const deadline = docsDeadline(period, holidays)
+  return evals
+    .filter(e => e.po.patDate && monthOf(e.po.patDate) === period)
+    .map(ev => ({ ev, deadline, missing: !ev.po.docsSubmittedAt, late: isDocsLate(ev.po.docsSubmittedAt, deadline) }))
+}
+
+/** State of one month's close, saved as the PMs work through it. */
+export interface MonthClose {
+  period: string
+  steps: Partial<Record<CloseStepKey, { doneAt: string; by: string }>>
+  /** PM-edited gap analysis text and review flag per fallout PO. */
+  gap: Record<string, { text: string; reviewed: boolean }>
+  /** POs the PM chose not to charge, with the reason (shown on the recommendation). */
+  waived: Record<string, string>
+  notices: Record<string, { sentAt?: string; ack?: { name: string; at: string }; disputed?: string }>
+}
+export const emptyClose = (period: string): MonthClose => ({ period, steps: {}, gap: {}, waived: {}, notices: {} })

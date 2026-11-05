@@ -45,7 +45,7 @@ export interface Scorecard {
   /** Share of completed POs whose as-built docs missed the Day 1 midnight cutoff. */
   docsLateRate: number | null
   ldExposure: number
-  /** On-time rate for each of the last 3 months (null = nothing completed that month). */
+  /** On-time rate for each of the last 3 complete months (null = nothing accepted that month). */
   trend: { period: string; rate: number | null }[]
 }
 
@@ -69,7 +69,7 @@ export function scorecards(snap: Snapshot, evals: PoEval[], s: Settings, asOf: I
       excusedDays,
       docsLateRate: rate(docsLate.length, done.length),
       ldExposure: ldExposure(mine, asOf, s.holidays),
-      trend: [-2, -1, 0].map(i => {
+      trend: [-3, -2, -1].map(i => {
         const period = addMonths(now, i)
         const m = done.filter(e => monthOf(e.po.patDate!) === period)
         return { period, rate: rate(m.filter(e => e.ld.lateDays === 0).length, m.length) }
@@ -140,4 +140,21 @@ export function statusBy(evals: PoEval[], groups: { id: string; name: string }[]
     const mine = evals.filter(e => key(e) === g.id)
     return { id: g.id, name: g.name, total: mine.length, counts: Object.fromEntries(STATUSES.map(s => [s, mine.filter(e => e.status === s).length])) as Record<Status, number> }
   }).filter(r => r.total > 0)
+}
+
+export interface ReasonRow { code: string; label: string; ldEligible: boolean; days: number; pos: number }
+
+/** Blocker days by reason code across the given POs (each blocker counted to its end, today, or PAT). */
+export function delaysByReason(evals: PoEval[]): ReasonRow[] {
+  const map = new Map<string, ReasonRow>()
+  for (const e of evals) {
+    const seen = new Set<string>()
+    for (const p of e.ld.periods) {
+      const row = map.get(p.reasonCode) ?? { code: p.reasonCode, label: p.label, ldEligible: p.ldEligible, days: 0, pos: 0 }
+      row.days += p.days
+      if (!seen.has(p.reasonCode)) { row.pos++; seen.add(p.reasonCode) }
+      map.set(p.reasonCode, row)
+    }
+  }
+  return [...map.values()].sort((a, b) => b.days - a.days)
 }

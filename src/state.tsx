@@ -25,6 +25,8 @@ interface Data {
   setTheme: (t: Theme) => void
   /** Swap in a newer snapshot after a write (sync, incident edit). */
   setSnap: (s: Snapshot) => void
+  /** Save settings; every screen re-evaluates with them. */
+  setSettings: (s: Settings) => void
 }
 
 const Ctx = createContext<Data | null>(null)
@@ -51,6 +53,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => { document.documentElement.dataset.theme = theme }, [theme])
+  // Franchise branding is just three CSS variables.
+  const brand = loaded?.settings.brand
+  useEffect(() => {
+    const root = document.documentElement.style
+    if (!brand) { ['--brand-orange', '--brand-magenta', '--brand-violet'].forEach(v => root.removeProperty(v)); return }
+    root.setProperty('--brand-orange', brand.orange); root.setProperty('--brand-magenta', brand.magenta); root.setProperty('--brand-violet', brand.violet)
+  }, [brand])
   // Dev-only hook for scripted screenshots.
   useEffect(() => { if (import.meta.env.DEV) (window as unknown as { __select: typeof select }).__select = select }, [])
   const setTheme = (t: Theme) => {
@@ -72,6 +81,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       ...loaded, evals, byId: new Map(evals.map(e => [e.po.id, e])),
       filters, setFilters, matchesScope, matches, selectedId, select, theme, setTheme,
       setSnap: (snap: Snapshot) => setLoaded(l => (l ? { ...l, snap } : l)),
+      setSettings: (settings: Settings) => { setLoaded(l => (l ? { ...l, settings } : l)); repo.saveSettings(settings) },
     }
   }, [loaded, filters, selectedId, theme])
 
