@@ -193,8 +193,7 @@ export function generateSeed({ asOf, nowMs }: SeedOptions): Snapshot {
       } else ptl.push(ptlFor(1, start, D, addDays(start, -7)))
 
       // Simulate how the job actually runs.
-      const workDur = Math.round(D / perf)
-      let actualDur = workDur
+      let actualDur = work
       let blockedSoFar = 0
       if (r() < 0.3) {
         const code = weighted(NON_LD)
@@ -226,7 +225,7 @@ export function generateSeed({ asOf, nowMs }: SeedOptions): Snapshot {
 
       const finish = addDays(start, actualDur)
       const done = finish <= asOf
-      const frac = done ? 1 : Math.max(0, Math.min(0.97, (diffDays(start, asOf) - blockedSoFar) / workDur))
+      const frac = done ? 1 : Math.max(0, Math.min(0.97, (diffDays(start, asOf) - blockedSoFar) / work))
       const progress = Object.fromEntries(MILESTONES.map(k => {
         const [w0, w1] = WINDOWS[k]
         return [k, Math.round(Math.min(1, Math.max(0, (frac - w0) / (w1 - w0))) * 100)]

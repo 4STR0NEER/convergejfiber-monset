@@ -19,6 +19,9 @@ export interface Repository {
   submit(sub: Submission): Promise<Snapshot>
   /** Office edits to an incident (BOM, award, undertaking). */
   saveIncident(i: Incident): Promise<Snapshot>
+  /** Replace the drawn network (imported KMZ/KML/GeoJSON). null = back to the assumed routes. */
+  saveNetwork(n: { name: string; network: Network } | null): Promise<void>
+  getNetworkSource(): Promise<string>
   getClose(period: string): Promise<MonthClose>
   saveClose(c: MonthClose): Promise<void>
 }
@@ -52,9 +55,26 @@ const nudge = ([lng, lat]: LngLat, key: string): LngLat => {
 
 export class LocalRepo implements Repository {
   private snap?: Snapshot
-  private network = parseNetwork(networkJson as never)
+  private network?: Network
+  private source = 'Assumed routes (network.geo.json)'
 
-  async getNetwork() { return this.network }
+  async getNetwork() {
+    if (this.network) return this.network
+    const imported = await get<{ name: string; network: Network }>('cjf.network').catch(() => undefined)
+    const assumed = parseNetwork(networkJson as never)
+    if (!imported) return (this.network = assumed)
+    this.source = `Imported: ${imported.name}`
+    // A route file without node points keeps the known NOC and hubs.
+    return (this.network = { ...imported.network, hubs: imported.network.hubs.length ? imported.network.hubs : assumed.hubs, source: imported.name })
+  }
+
+  async getNetworkSource() { await this.getNetwork(); return this.source }
+
+  async saveNetwork(n: { name: string; network: Network } | null) {
+    await (n ? set('cjf.network', n) : set('cjf.network', undefined)).catch(() => { /* not persisted */ })
+    this.network = undefined
+    this.snap = undefined // crews and incidents are re-placed on the new routes
+  }
 
   async submit(sub: Submission) {
     const log = ((await get<Submission[]>(APPLIED_KEY).catch(() => undefined)) ?? []).concat(sub)
@@ -76,7 +96,7 @@ export class LocalRepo implements Repository {
     if (this.snap) return this.snap
     const snap = generateSeed({ asOf: todayManila(), nowMs: Date.now() })
     // The seed only knows clusters; put crews, updates and incidents on their PO's drawn route.
-    const seg = new Map(this.network.segments.map(s => [s.poId, s]))
+    const seg = new Map((await this.getNetwork()).segments.map(s => [s.poId, s]))
     const workFront = (poId: string) => {
       const po = snap.pos.find(p => p.id === poId)!
       const s = seg.get(poId)

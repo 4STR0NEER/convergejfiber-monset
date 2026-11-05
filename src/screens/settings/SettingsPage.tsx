@@ -1,4 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { repo } from '../../data/repo'
+import { importRoutes } from '../../data/importRoutes'
+import type { Network } from '../../domain/types'
 import { Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { DEFAULT_SETTINGS } from '../../domain/config'
 import { fmtDate } from '../../domain/dates'
@@ -124,6 +127,8 @@ export function SettingsPage() {
         <p className="mt-2 text-xs text-muted">Removing a code keeps past blockers; they are then treated as contractor attributable until the code is restored.</p>
       </Panel>
 
+      <RouteData />
+
       <Panel className="mt-4" title="Holidays" sub="Skipped when counting month-end Day 1 to Day 10">
         <ul className="flex flex-wrap gap-2 text-[13px]">
           {[...draft.holidays].sort().map(d => (
@@ -159,5 +164,59 @@ export function SettingsPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+/** Swap the assumed geometry for the client's real routes (KMZ / KML / GeoJSON). */
+function RouteData() {
+  const { snap } = useData()
+  const [source, setSource] = useState('')
+  const [pending, setPending] = useState<{ name: string; network: Network; unmatched: number } | null>(null)
+  const [error, setError] = useState('')
+  useEffect(() => { repo.getNetworkSource().then(setSource) }, [])
+  const ids = new Set(snap.pos.map(p => p.id))
+  const summary = pending && (() => {
+    const inFile = new Set(pending.network.segments.map(s => s.poId))
+    return {
+      segments: pending.network.segments.length,
+      mainline: pending.network.segments.filter(s => s.tier === 'mainline').length,
+      matched: [...inFile].filter(id => ids.has(id)).length,
+      unknown: [...inFile].filter(id => !ids.has(id)).length,
+      noRoute: snap.pos.filter(p => !inFile.has(p.id)).length,
+    }
+  })()
+  const apply = async (n: { name: string; network: Network } | null) => { await repo.saveNetwork(n); location.reload() }
+  return (
+    <Panel className="mt-4" title="Route data" sub="Replace the assumed geometry with real routes. Each line needs its PO / WO number (ExtendedData PO, PO_NO or WO, or in the name).">
+      <p className="text-[13px]">Now showing: <span className="font-medium">{source || '…'}</span></p>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 text-[13px] hover:bg-surface-2 focus-within:border-[var(--accent)]">
+          Choose KMZ, KML or GeoJSON
+          <input type="file" accept=".kmz,.kml,.geojson,.json" className="sr-only" onChange={async e => {
+            const f = e.target.files?.[0]; if (!f) return
+            setError(''); setPending(null)
+            try { const r = await importRoutes(f); setPending({ name: f.name, ...r }) } catch (err) { setError(`Could not read ${f.name}: ${(err as Error).message}`) }
+          }} />
+        </label>
+        {source.startsWith('Imported') && <button onClick={() => apply(null)} className="text-[13px] text-muted hover:text-text">Restore assumed routes</button>}
+      </div>
+      {error && <p role="alert" className="mt-2 text-[13px] text-bad">{error}</p>}
+      {summary && pending && (
+        <div className="mt-4 rounded-xl border border-border p-4 text-[13px]">
+          <p className="font-medium">{pending.name}</p>
+          <ul className="mt-1 grid gap-x-6 gap-y-0.5 text-muted sm:grid-cols-2">
+            <li>{summary.segments} route lines ({summary.mainline} marked mainline)</li>
+            <li>{summary.matched} of {snap.pos.length} POs matched</li>
+            <li>{pending.unmatched} lines without a PO number (skipped)</li>
+            <li>{summary.unknown} PO numbers not in this portfolio</li>
+            <li>{summary.noRoute} POs with no route in the file (they stay off the map)</li>
+          </ul>
+          <div className="mt-3 flex gap-2">
+            <button disabled={!summary.segments} onClick={() => apply(pending)} className="rounded-lg bg-text px-3 py-1.5 text-[13px] font-semibold text-bg disabled:opacity-40">Use these routes</button>
+            <button onClick={() => setPending(null)} className="rounded-lg border border-border px-3 py-1.5 text-[13px]">Cancel</button>
+          </div>
+        </div>
+      )}
+    </Panel>
   )
 }

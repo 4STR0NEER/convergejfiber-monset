@@ -1,21 +1,25 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Route, Routes, useLocation } from 'react-router'
 import { Moon, Sun } from 'lucide-react'
 import { useData } from './state'
+import { ErrorBoundary, ScreenLoading } from './ui/ErrorBoundary'
 import { NavTabs, type Tab } from './ui/NavTabs'
 import { ago } from './ui/format'
-import { CommandCenter } from './screens/command/CommandCenter'
-import { Portfolio } from './screens/portfolio/Portfolio'
-import { PoDetail } from './screens/po/PoDetail'
 import { revealTheme } from './ui/skiper/themeReveal'
-import { FieldPage } from './screens/field/FieldApp'
-import { Incidents } from './screens/incidents/Incidents'
-import { Ack } from './screens/incidents/Ack'
-import { MonthEnd } from './screens/monthend/MonthEnd'
-import { NoticeDoc, RecommendationDoc } from './screens/monthend/Documents'
-import { Scorecards } from './screens/scorecards/Scorecards'
-import { SettingsPage } from './screens/settings/SettingsPage'
 
+
+// Each screen is its own chunk: the map stack (deck.gl + MapLibre) and Recharts load only where used.
+const CommandCenter = lazy(() => import('./screens/command/CommandCenter').then(m => ({ default: m.CommandCenter })))
+const Portfolio = lazy(() => import('./screens/portfolio/Portfolio').then(m => ({ default: m.Portfolio })))
+const PoDetail = lazy(() => import('./screens/po/PoDetail').then(m => ({ default: m.PoDetail })))
+const FieldPage = lazy(() => import('./screens/field/FieldApp').then(m => ({ default: m.FieldPage })))
+const Incidents = lazy(() => import('./screens/incidents/Incidents').then(m => ({ default: m.Incidents })))
+const Ack = lazy(() => import('./screens/incidents/Ack').then(m => ({ default: m.Ack })))
+const MonthEnd = lazy(() => import('./screens/monthend/MonthEnd').then(m => ({ default: m.MonthEnd })))
+const NoticeDoc = lazy(() => import('./screens/monthend/Documents').then(m => ({ default: m.NoticeDoc })))
+const RecommendationDoc = lazy(() => import('./screens/monthend/Documents').then(m => ({ default: m.RecommendationDoc })))
+const Scorecards = lazy(() => import('./screens/scorecards/Scorecards').then(m => ({ default: m.Scorecards })))
+const SettingsPage = lazy(() => import('./screens/settings/SettingsPage').then(m => ({ default: m.SettingsPage })))
 const TABS: Tab[] = [
   { to: '/', label: 'Command Center' },
   { to: '/portfolio', label: 'Portfolio', also: ['/po/'] },
@@ -29,12 +33,15 @@ const TABS: Tab[] = [
 export default function App() {
   const { pathname } = useLocation()
   // The signing page is for an outside party: no internal navigation.
-  if (pathname.startsWith('/ack/')) return <main className="h-full overflow-y-auto"><Routes><Route path="/ack/:id" element={<Ack />} /></Routes></main>
+  if (pathname.startsWith('/ack/')) return <main className="h-full overflow-y-auto"><Suspense fallback={<ScreenLoading />}><Routes><Route path="/ack/:id" element={<Ack />} /></Routes></Suspense></main>
   return (
     <div className="flex h-full flex-col">
+      <a href="#main" className="sr-only z-50 rounded-lg bg-text px-3 py-2 text-sm font-medium text-bg focus:not-sr-only focus:absolute focus:left-3 focus:top-3">Skip to content</a>
       {/* On a phone the Field App is the whole screen. */}
       <div className={pathname.startsWith('/field') ? 'max-md:hidden' : ''}><Header /></div>
-      <main className="min-h-0 flex-1 overflow-y-auto">
+      <main id="main" tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto outline-none">
+        <ErrorBoundary key={pathname}>
+        <Suspense fallback={<ScreenLoading />}>
         <Routes>
           <Route index element={<CommandCenter />} />
           <Route path="/portfolio" element={<Portfolio />} />
@@ -51,6 +58,8 @@ export default function App() {
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </Suspense>
+        </ErrorBoundary>
       </main>
     </div>
   )
@@ -105,7 +114,7 @@ function LiveStamp() {
         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--st-ontrack)] opacity-50 motion-reduce:hidden" />
         <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--st-ontrack)]" />
       </span>
-      Last field update {latest ? ago(latest, now) : 'none yet'}
+      <span><span className="hidden xl:inline">Last field update </span>{latest ? ago(latest, now) : 'none yet'}</span>
     </p>
   )
 }

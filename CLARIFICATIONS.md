@@ -5,7 +5,7 @@ Living file. Updated at the end of every phase. Three parts:
 2. **Decisions made** (answered by Monset, with date).
 3. **Assumptions** we made about process and data, so nothing assumed gets mistaken for confirmed.
 
-Last updated: 2026-11-05 (Phase 5)
+Last updated: 2026-11-05 (Phase 6, prototype complete)
 
 ---
 
@@ -47,6 +47,7 @@ Last updated: 2026-11-05 (Phase 5)
 | Q33 | Claim amount date | Is the LD on a notice computed as of month end, or as of the date the notice is issued? | As of month end (open POs keep accruing and appear again next month). |
 | Q34 | Finance | Is claimed LD deducted from the contractor's next payment? Should the system hand off to finance/SAP? | Out of scope; the notice is the hand-off. |
 | Q35 | Settings access | Who may change LD rate, cap, reason codes and weights? Is an audit trail needed? | Any user can change them; changes apply to every screen at once. No audit trail yet. |
+| Q36 | Route import | Can the client share one sample KMZ early, so we can confirm where PO numbers sit and how mainline vs distribution lines are marked? | Import accepts KMZ/KML/GeoJSON and matches by ExtendedData PO / PO_NO / WO or the Placemark name; "main", "backbone" or "ring" in the name = mainline. |
 | Q20 | Map provider | Is a free OpenStreetMap basemap acceptable for production, or does Converge have a licensed basemap / GIS server? | OpenFreeMap (no API key), with attribution shown. |
 
 ## 2. Decisions made
@@ -150,3 +151,10 @@ All data is invented. Nothing comes from Converge or any real contractor.
 - **Scorecards**: on-time rate, their share of delay, docs late rate, LD exposure, status mix, and on-time trend over the last three complete months; detail shows delay days by reason (contractor side vs excused), six months of accepted on time vs late, and open POs.
 - **Settings** apply to every screen when saved and are stored in the browser. A live what-if shows how Trending Late / At Risk / Delayed counts and LD exposure would change before saving. Weights must total 100.
 - **Franchise brand colours** are editable in Settings (three CSS variables drive the whole brand gradient).
+
+### Polish pass (Phase 6)
+
+- **NOC marker** is now a brand-gradient pin with a hub-and-spoke glyph and a pulse on the ground (static ring under reduced motion / 2D), replacing the extruded column.
+- **Route data import** is available in Settings and kept in the browser only. Imported files without node points keep the assumed NOC and hubs. POs with no line in the file stay off the map; their crews keep the seed position.
+- **Code splitting**: every screen is its own chunk, and the map stack loads after the KPI strip paints.
+- **Keyboard path into the map**: "Find a PO" search; a skip link before the navigation.

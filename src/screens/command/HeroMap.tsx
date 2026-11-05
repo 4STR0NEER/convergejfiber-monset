@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import DeckGL from '@deck.gl/react'
 import { FlyToInterpolator, type Layer, type MapViewState, type PickingInfo } from '@deck.gl/core'
-import { ColumnLayer, IconLayer, PathLayer, ScatterplotLayer, TextLayer } from '@deck.gl/layers'
+import { IconLayer, PathLayer, ScatterplotLayer, TextLayer } from '@deck.gl/layers'
 import { TripsLayer } from '@deck.gl/geo-layers'
 import { PathStyleExtension, type PathStyleExtensionProps } from '@deck.gl/extensions'
 import { Map as MapGL, type MapRef } from 'react-map-gl/maplibre'
@@ -40,6 +40,16 @@ const INCIDENT_ICON = svgUrl(`<svg xmlns="http://www.w3.org/2000/svg" width="64"
   <rect x="12" y="12" width="40" height="40" rx="6" transform="rotate(45 32 32)" fill="#e11d48" stroke="#fff" stroke-width="4"/>
   <rect x="29" y="19" width="6" height="18" rx="3" fill="#fff"/><circle cx="32" cy="44" r="3.6" fill="#fff"/></svg>`)
 
+/** The core node: a brand-gradient pin with a hub-and-spoke glyph (replaces the old extruded column). */
+const nocPin = (b: { orange: string; magenta: string; violet: string }) => svgUrl(`<svg xmlns="http://www.w3.org/2000/svg" width="96" height="128" viewBox="0 0 96 128">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${b.orange}"/><stop offset=".55" stop-color="${b.magenta}"/><stop offset="1" stop-color="${b.violet}"/></linearGradient></defs>
+  <path d="M48 124C48 124 7 79 7 46a41 41 0 1 1 82 0c0 33-41 78-41 78Z" fill="url(#g)" stroke="#fff" stroke-width="5"/>
+  <circle cx="48" cy="46" r="25" fill="#0d0b14"/>
+  <g stroke="#fff" stroke-width="3.5" stroke-linecap="round"><path d="M48 46 33 36M48 46l15-10M48 46v17"/></g>
+  <circle cx="48" cy="46" r="6.5" fill="${b.orange}" stroke="#fff" stroke-width="2.5"/>
+  <g fill="#fff"><circle cx="31" cy="35" r="4.5"/><circle cx="65" cy="35" r="4.5"/><circle cx="48" cy="65" r="4.5"/></g></svg>`)
+const DEFAULT_BRAND = { orange: '#ff6b1a', magenta: '#d6337f', violet: '#7c3aed' }
+
 const hashUnit = (s: string) => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return ((h >>> 0) % 1000) / 1000 }
 
 /** The intro is a once-per-session moment, not something to sit through on every visit. */
@@ -48,7 +58,8 @@ let introPlayed = false
 interface Props { mode3d: boolean; reduceMotion: boolean; resetSignal: number }
 
 export function HeroMap({ mode3d, reduceMotion, resetSignal }: Props) {
-  const { network, snap, byId, matches, matchesScope, selectedId, select, theme } = useData()
+  const { network, snap, byId, matches, matchesScope, selectedId, select, theme, settings } = useData()
+  const pinUrl = useMemo(() => nocPin(settings.brand ?? DEFAULT_BRAND), [settings.brand])
   // Arriving with a PO already selected ("Show on map"): skip the intro and fly straight to it.
   const [skipIntro] = useState(() => reduceMotion || !!selectedId || introPlayed)
   const [view, setView] = useState<MapViewState>(skipIntro ? HOME : { ...HOME, zoom: 14.2, pitch: 62, bearing: -40, longitude: NOC[0], latitude: NOC[1] })
@@ -200,18 +211,23 @@ export function HeroMap({ mode3d, reduceMotion, resetSignal }: Props) {
 
   const hubs = network.hubs
   layers.push(
-    mode3d && new ColumnLayer<Hub>({
-      id: 'noc', data: hubs.filter(h => h.core), getPosition: h => h.coord, diskResolution: 6, radius: 55,
-      extruded: true, getElevation: 320, getFillColor: [124, 58, 237, 230], material: false,
+    // Ground pulse under the NOC pin: two rings expanding out of phase (one static ring when motion is off).
+    new ScatterplotLayer<{ coord: LngLat; phase: number }>({
+      id: 'noc-pulse', data: hubs.filter(h => h.core).flatMap(h => (reduceMotion || !mode3d ? [0.5] : [0, 0.5]).map(o => ({ coord: h.coord, phase: o }))),
+      getPosition: d => d.coord, radiusUnits: 'meters', stroked: true, filled: true, lineWidthUnits: 'pixels', getLineWidth: 1.5,
+      getRadius: d => { const p = reduceMotion || !mode3d ? 0.5 : ((time / 1.5) + d.phase) % 1; return 70 + p * 520 },
+      getFillColor: d => { const p = reduceMotion || !mode3d ? 0.5 : ((time / 1.5) + d.phase) % 1; return [255, 107, 26, Math.round(34 * (1 - p))] },
+      getLineColor: d => { const p = reduceMotion || !mode3d ? 0.5 : ((time / 1.5) + d.phase) % 1; return [255, 138, 71, Math.round(200 * (1 - p))] },
+      updateTriggers: { getRadius: time, getFillColor: time, getLineColor: time },
     }),
     new ScatterplotLayer<Hub>({
-      id: 'hubs', data: hubs, getPosition: h => h.coord, getRadius: h => (h.core ? 9 : 6), radiusUnits: 'pixels',
+      id: 'hubs', data: hubs.filter(h => !h.core), getPosition: h => h.coord, getRadius: h => (h.core ? 9 : 6), radiusUnits: 'pixels',
       stroked: true, getLineWidth: 2.5, lineWidthUnits: 'pixels',
       getFillColor: theme === 'dark' ? [13, 11, 20, 255] : [255, 255, 255, 255], getLineColor: [255, 107, 26, 255],
     }),
     new TextLayer<Hub>({
       id: 'hub-labels', data: hubs, getPosition: h => h.coord, getText: h => (h.core ? 'Mandaue NOC' : h.name.replace(/ hub$/, '')),
-      getSize: h => (h.core ? 14 : 12), getPixelOffset: h => [0, h.core ? -36 : -18], fontFamily: 'Archivo Variable, sans-serif', fontWeight: 600,
+      getSize: h => (h.core ? 14 : 12), getPixelOffset: h => [0, h.core ? -66 : -18], fontFamily: 'Archivo Variable, sans-serif', fontWeight: 600,
       getColor: theme === 'dark' ? [243, 240, 247, 255] : [21, 18, 28, 255],
       background: true, getBackgroundColor: theme === 'dark' ? [13, 11, 20, 200] : [255, 255, 255, 220], backgroundPadding: [6, 3],
       characterSet: 'auto',
@@ -219,6 +235,10 @@ export function HeroMap({ mode3d, reduceMotion, resetSignal }: Props) {
     new IconLayer<Crew>({
       id: 'crews', data: crews, getPosition: c => c.lastCheckIn.gps, pickable: true,
       getIcon: () => ({ url: CREW_ICON, width: 64, height: 80, anchorY: 80 }), getSize: 140, sizeUnits: 'meters', sizeMinPixels: 15, sizeMaxPixels: 34,
+    }),
+    new IconLayer<Hub>({
+      id: 'noc', data: hubs.filter(h => h.core), getPosition: h => h.coord, pickable: true,
+      getIcon: () => ({ url: pinUrl, width: 96, height: 128, anchorY: 128, id: pinUrl }), getSize: 54, sizeUnits: 'pixels',
     }),
     new IconLayer<Incident>({
       id: 'incidents', data: incidents, getPosition: i => i.gps, pickable: true,
@@ -244,6 +264,9 @@ export function HeroMap({ mode3d, reduceMotion, resetSignal }: Props) {
           <div style="font-weight:600">${ev.po.title}</div>
           <div style="opacity:.8">${Math.round(ev.progressPct)}% done · target ${fmtDate(ev.effectiveTarget)}${ev.ld.amount ? ` · LD ${pesoShort(ev.ld.amount)}` : ''}</div>`,
       }
+    }
+    if (layer.id === 'noc') {
+      return { style: tipStyle, html: `<b>Mandaue core / NOC</b><div style="opacity:.8">Placeholder location until the real node list arrives.</div><div>${network.segments.filter(s => s.tier === 'mainline').length} mainline segments, ${network.segments.length} total</div>` }
     }
     if (layer.id === 'crews') {
       const c = object as Crew
