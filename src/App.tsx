@@ -1,97 +1,107 @@
-// Phase 1 shell: proves the domain + seed end to end. Replaced by the real screens from Phase 2.
 import { useEffect, useState } from 'react'
-import { repo } from './data/repo'
-import { addMonths, fmtDate, monthOf, peso } from './domain/dates'
-import { ldExposure, monthlySeries, reconcile } from './domain/metrics'
-import { closeSchedule } from './domain/monthEnd'
-import { evaluateAll, STATUS_LABEL, STATUSES } from './domain/status'
-import type { Settings, Snapshot } from './domain/types'
+import { Route, Routes } from 'react-router'
+import { Moon, Sun } from 'lucide-react'
+import { useData } from './state'
+import { NavTabs, type Tab } from './ui/NavTabs'
+import { ago } from './ui/format'
+import { CommandCenter } from './screens/command/CommandCenter'
+
+const TABS: Tab[] = [
+  { to: '/', label: 'Command Center' },
+  { to: '/portfolio', label: 'Portfolio' },
+  { to: '/scorecards', label: 'Scorecards' },
+  { to: '/month-end', label: 'Month-End Close' },
+  { to: '/incidents', label: 'Incidents' },
+  { to: '/field', label: 'Field App' },
+  { to: '/settings', label: 'Settings' },
+]
+
+const COMING: Record<string, { phase: number; what: string }> = {
+  '/portfolio': { phase: 3, what: 'Milestone progress, target vs actual by month, status by cluster and category, top contractors, and the full PO detail with Gantt and LD breakdown.' },
+  '/scorecards': { phase: 5, what: 'On-time rate, attributable delay share, documentation lateness, LD exposure and trend per contractor.' },
+  '/month-end': { phase: 5, what: 'Guided Day 1 to Day 10 close: fallout list, pre-drafted gap analyses, LD recommendations and notices, contractor acknowledgment.' },
+  '/incidents': { phase: 4, what: 'Third-party damage claims: incident report, undertaking, optional blotter, and BOM for temporary and permanent restoration.' },
+  '/field': { phase: 4, what: 'Offline-first crew app: my POs, photo-proof updates with GPS and time, blockers with reason codes, incident reports.' },
+  '/settings': { phase: 5, what: 'Delay reason codes, milestone weights, risk thresholds, LD rate and cap, holidays.' },
+}
 
 export default function App() {
-  const [data, setData] = useState<{ snap: Snapshot; s: Settings }>()
-  useEffect(() => { Promise.all([repo.getSnapshot(), repo.getSettings()]).then(([snap, s]) => setData({ snap, s })) }, [])
-  if (!data) return <p className="p-8 text-muted">Loading portfolio…</p>
-
-  const { snap, s } = data
-  const evals = evaluateAll(snap, s)
-  const checks = reconcile(snap, evals, s, snap.asOf)
-  const count = (f: (e: (typeof evals)[number]) => boolean) => evals.filter(f).length
-  const top = [...evals].sort((a, b) => b.ld.amount - a.ld.amount).slice(0, 6)
-  const lastPeriod = addMonths(monthOf(snap.asOf), -1)
-
   return (
-    <main className="mx-auto max-w-6xl space-y-8 px-4 py-8">
-      <header>
-        <div className="h-1 w-24 rounded-full" style={{ background: 'var(--brand-gradient)' }} />
-        <h1 className="mt-3 text-2xl font-semibold">Converge-J Fiber · Backbone Command</h1>
-        <p className="text-muted">Phase 1 data check. As of {fmtDate(snap.asOf)} · assumed seed data</p>
-      </header>
-
-      <section aria-label="KPIs" className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <Kpi label="Total PO/WO" value={evals.length} />
-        {STATUSES.map(st => <Kpi key={st} label={STATUS_LABEL[st]} value={count(e => e.status === st)} />)}
-        <Kpi label="Ongoing" value={count(e => e.activity === 'ONGOING')} />
-        <Kpi label="Not Started" value={count(e => e.activity === 'NOT_STARTED')} />
-        <Kpi label="LD exposure" value={peso(ldExposure(evals, snap.asOf, s.holidays))} />
-      </section>
-
-      <section className="grid gap-6 md:grid-cols-2">
-        <Card title={`Reconciliation · ${checks.every(c => c.ok) ? 'all totals match' : 'MISMATCH'}`}>
-          <ul className="space-y-1 text-sm">
-            {checks.map(c => (
-              <li key={c.label} className="flex justify-between gap-4">
-                <span>{c.ok ? '✓' : '✗'} {c.label}</span>
-                <span className={c.ok ? 'text-muted' : 'text-bad'}>{c.unit === 'php' ? peso(c.actual) : c.actual}</span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-
-        <Card title={`Month-end close · ${lastPeriod}`}>
-          <ol className="space-y-1 text-sm">
-            {closeSchedule(lastPeriod, s.holidays).map(st => (
-              <li key={st.key} className="flex justify-between gap-4">
-                <span>Day {st.from}{st.to !== st.from ? `–${st.to}` : ''}: {st.label}</span>
-                <span className="shrink-0 text-muted">{fmtDate(st.start)}</span>
-              </li>
-            ))}
-          </ol>
-          <h3 className="mt-4 text-sm font-medium">Target vs actual PAT</h3>
-          <ul className="text-sm">
-            {monthlySeries(evals, snap.asOf).map(m => (
-              <li key={m.period} className="flex justify-between"><span>{m.period}</span><span className="text-muted">target {m.target} · actual {m.actual} · on time {m.onTime}</span></li>
-            ))}
-          </ul>
-        </Card>
-      </section>
-
-      <Card title="Highest LD exposure (with plain-language why)">
-        <ul className="divide-y divide-border">
-          {top.map(e => (
-            <li key={e.po.id} className="py-3 text-sm">
-              <div className="flex justify-between gap-4 font-medium">
-                <span>{e.po.id} · {e.po.title} · {STATUS_LABEL[e.status]}</span>
-                <span className="text-accent">{peso(e.ld.amount)}</span>
-              </div>
-              <ul className="mt-1 list-disc pl-5 text-muted">{e.why.map(w => <li key={w}>{w}</li>)}</ul>
-            </li>
+    <div className="flex h-full flex-col">
+      <Header />
+      <main className="min-h-0 flex-1 overflow-y-auto md:overflow-hidden">
+        <Routes>
+          <Route index element={<CommandCenter />} />
+          {Object.entries(COMING).map(([path, c]) => (
+            <Route key={path} path={path} element={<Coming title={TABS.find(t => t.to === path)!.label} {...c} />} />
           ))}
-        </ul>
-      </Card>
-    </main>
+          <Route path="*" element={<Coming title="Not found" phase={0} what="This page does not exist." />} />
+        </Routes>
+      </main>
+    </div>
   )
 }
 
-const Kpi = ({ label, value }: { label: string; value: string | number }) => (
-  <div className="rounded-xl border border-border bg-surface p-3">
-    <div className="text-xs text-muted">{label}</div>
-    <div className="text-xl font-semibold">{value}</div>
-  </div>
-)
+function Header() {
+  const { theme, setTheme } = useData()
+  return (
+    <header className="relative z-30 flex items-center gap-4 border-b border-border bg-bg px-4 md:px-6">
+      <a href="/" className="flex shrink-0 items-center gap-2.5 py-3" aria-label="Converge-J Fiber Backbone Command, home">
+        <BrandMark />
+        <span className="hidden leading-tight sm:block">
+          <span className="block text-[14px] font-semibold tracking-tight">Converge-J Fiber</span>
+          <span className="block text-[11px] text-muted">Backbone Command</span>
+        </span>
+      </a>
+      <div className="min-w-0 flex-1"><NavTabs tabs={TABS} /></div>
+      <LiveStamp />
+      <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+        className="rounded-lg p-2 text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-text">
+        {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+      </button>
+    </header>
+  )
+}
 
-const Card = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <section className="rounded-2xl border border-border bg-surface p-5">
-    <h2 className="mb-3 font-semibold">{title}</h2>
-    {children}
-  </section>
-)
+/** A fiber strand bending into a J, lit from orange to violet, ending in a splice node. */
+function BrandMark() {
+  return (
+    <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true">
+      <defs>
+        <linearGradient id="cjf-g" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="var(--brand-orange)" /><stop offset=".55" stopColor="var(--brand-magenta)" /><stop offset="1" stopColor="var(--brand-violet)" />
+        </linearGradient>
+      </defs>
+      <rect width="32" height="32" rx="8" fill="var(--brand-black)" />
+      <path d="M8 8.5h14v9.5a6.5 6.5 0 0 1-13 0" fill="none" stroke="url(#cjf-g)" strokeWidth="3.2" strokeLinecap="round" />
+      <circle cx="8" cy="8.5" r="2.4" fill="var(--brand-orange)" />
+    </svg>
+  )
+}
+
+/** Honest "live": time since the newest field update, not a fake real-time feed. */
+function LiveStamp() {
+  const { snap } = useData()
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(t) }, [])
+  const latest = snap.updates.reduce((a, u) => (u.at > a ? u.at : a), '')
+  return (
+    <p className="hidden shrink-0 items-center gap-2 text-xs text-muted lg:flex" title="Field updates arrive when crews submit them; this is not real-time GPS.">
+      <span className="relative flex h-2 w-2">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--st-ontrack)] opacity-50 motion-reduce:hidden" />
+        <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--st-ontrack)]" />
+      </span>
+      Last field update {latest ? ago(latest, now) : 'none yet'}
+    </p>
+  )
+}
+
+function Coming({ title, phase, what }: { title: string; phase: number; what: string }) {
+  return (
+    <section className="mx-auto max-w-xl px-6 py-24">
+      <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+      {phase > 0 && <p className="mt-1 text-sm text-accent">Arrives in Phase {phase}</p>}
+      <p className="mt-4 text-muted">{what}</p>
+    </section>
+  )
+}

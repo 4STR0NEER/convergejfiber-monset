@@ -142,3 +142,8 @@ export interface Snapshot {
 }
 
 export const currentPtl = (po: PO): PtlVersion => po.ptl[po.ptl.length - 1]
+
+/** One drawn piece of fiber route. Each segment belongs to exactly one PO. */
+export interface Segment { segmentId: string; poId: string; tier: 'mainline' | 'sub'; corridor: string; path: LngLat[] }
+export interface Hub { id: string; name: string; coord: LngLat; core: boolean }
+export interface Network { segments: Segment[]; hubs: Hub[] }
