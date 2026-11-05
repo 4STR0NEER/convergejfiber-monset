@@ -5,10 +5,13 @@ import { useData } from './state'
 import { NavTabs, type Tab } from './ui/NavTabs'
 import { ago } from './ui/format'
 import { CommandCenter } from './screens/command/CommandCenter'
+import { Portfolio } from './screens/portfolio/Portfolio'
+import { PoDetail } from './screens/po/PoDetail'
+import { revealTheme } from './ui/skiper/themeReveal'
 
 const TABS: Tab[] = [
   { to: '/', label: 'Command Center' },
-  { to: '/portfolio', label: 'Portfolio' },
+  { to: '/portfolio', label: 'Portfolio', also: ['/po/'] },
   { to: '/scorecards', label: 'Scorecards' },
   { to: '/month-end', label: 'Month-End Close' },
   { to: '/incidents', label: 'Incidents' },
@@ -17,7 +20,6 @@ const TABS: Tab[] = [
 ]
 
 const COMING: Record<string, { phase: number; what: string }> = {
-  '/portfolio': { phase: 3, what: 'Milestone progress, target vs actual by month, status by cluster and category, top contractors, and the full PO detail with Gantt and LD breakdown.' },
   '/scorecards': { phase: 5, what: 'On-time rate, attributable delay share, documentation lateness, LD exposure and trend per contractor.' },
   '/month-end': { phase: 5, what: 'Guided Day 1 to Day 10 close: fallout list, pre-drafted gap analyses, LD recommendations and notices, contractor acknowledgment.' },
   '/incidents': { phase: 4, what: 'Third-party damage claims: incident report, undertaking, optional blotter, and BOM for temporary and permanent restoration.' },
@@ -29,9 +31,11 @@ export default function App() {
   return (
     <div className="flex h-full flex-col">
       <Header />
-      <main className="min-h-0 flex-1 overflow-y-auto md:overflow-hidden">
+      <main className="min-h-0 flex-1 overflow-y-auto">
         <Routes>
           <Route index element={<CommandCenter />} />
+          <Route path="/portfolio" element={<Portfolio />} />
+          <Route path="/po/:id" element={<PoDetail />} />
           {Object.entries(COMING).map(([path, c]) => (
             <Route key={path} path={path} element={<Coming title={TABS.find(t => t.to === path)!.label} {...c} />} />
           ))}
@@ -55,7 +59,7 @@ function Header() {
       </a>
       <div className="min-w-0 flex-1"><NavTabs tabs={TABS} /></div>
       <LiveStamp />
-      <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+      <button onClick={e => { const el = e.currentTarget; revealTheme(() => setTheme(theme === 'dark' ? 'light' : 'dark'), el) }} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
         className="rounded-lg p-2 text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-text">
         {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
       </button>

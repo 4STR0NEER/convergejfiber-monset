@@ -1,7 +1,7 @@
 import { addMonths, monthOf, type ISODate } from './dates'
 import { closeDays, docsDeadline, isDocsLate } from './monthEnd'
-import { STATUSES, type PoEval } from './status'
-import { currentPtl, type Activity, type Settings, type Snapshot } from './types'
+import { plannedMilestonePct, STATUSES, type PoEval } from './status'
+import { currentPtl, MILESTONES, type Activity, type MilestoneKey, type Settings, type Snapshot, type Status } from './types'
 
 /**
  * LD still in play: POs not yet accepted (accruing), plus POs accepted in a month
@@ -110,4 +110,34 @@ export function reconcile(snap: Snapshot, evals: PoEval[], s: Settings, asOf: IS
   const acts: Activity[] = ['COMPLETED', 'ONGOING', 'NOT_STARTED']
   push('Completed + Ongoing + Not Started', total, acts.reduce((a, x) => a + evals.filter(e => e.activity === x).length, 0), 'count')
   return checks
+}
+
+// ---------- portfolio aggregates ----------
+
+export interface MilestoneSummary { key: MilestoneKey; avgProgress: number; avgPlanned: number; complete: number; total: number }
+
+/** Average actual vs planned % per milestone across the given POs (completed POs count as 100). */
+export function milestoneSummary(evals: PoEval[], asOf: ISODate): MilestoneSummary[] {
+  return MILESTONES.map(key => {
+    const n = evals.length || 1
+    const actual = (e: PoEval) => (e.activity === 'COMPLETED' ? 100 : e.po.progress[key])
+    const planned = (e: PoEval) => (e.activity === 'COMPLETED' ? 100 : plannedMilestonePct(e.po, key, asOf))
+    return {
+      key,
+      avgProgress: evals.reduce((a, e) => a + actual(e), 0) / n,
+      avgPlanned: evals.reduce((a, e) => a + planned(e), 0) / n,
+      complete: evals.filter(e => actual(e) >= 100).length,
+      total: evals.length,
+    }
+  })
+}
+
+export interface StatusRow { id: string; name: string; counts: Record<Status, number>; total: number }
+
+/** Status mix per group (cluster, category, program...). Rows keep the list order; empty groups are dropped. */
+export function statusBy(evals: PoEval[], groups: { id: string; name: string }[], key: (e: PoEval) => string): StatusRow[] {
+  return groups.map(g => {
+    const mine = evals.filter(e => key(e) === g.id)
+    return { id: g.id, name: g.name, total: mine.length, counts: Object.fromEntries(STATUSES.map(s => [s, mine.filter(e => e.status === s).length])) as Record<Status, number> }
+  }).filter(r => r.total > 0)
 }

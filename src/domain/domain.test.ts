@@ -4,7 +4,7 @@ import { addDays, coveredDays } from './dates'
 import { computeLd } from './ld'
 import { closeDays, docsDeadline, draftGapAnalysis, falloutList, isDocsLate, ldRecommendations } from './monthEnd'
 import { evaluateAll, evaluatePO, weightedProgress } from './status'
-import { reconcile, scorecards } from './metrics'
+import { milestoneSummary, monthlySeries, reconcile, scorecards, statusBy } from './metrics'
 import type { DelayEvent, PO } from './types'
 import { generateSeed } from '../data/seed'
 
@@ -215,5 +215,19 @@ describe('seed + reconciliation', () => {
   it('scorecards cover every PO once', () => {
     const cards = scorecards(snap, evals, S, asOf)
     expect(cards.reduce((a, c) => a + c.total, 0)).toBe(evals.length)
+  })
+
+  it('portfolio aggregates add up', () => {
+    const rows = statusBy(evals, snap.clusters, e => e.po.clusterId)
+    expect(rows.reduce((a, r) => a + r.total, 0)).toBe(evals.length)
+    for (const r of rows) expect(Object.values(r.counts).reduce((a, n) => a + n, 0)).toBe(r.total)
+    const ms = milestoneSummary(evals, asOf)
+    expect(ms.map(m => m.key)).toEqual(['ENG', 'ROW', 'CIVIL', 'FOC'])
+    // Engineering comes first, so it is always at least as far along as FOC on average.
+    expect(ms[0].avgProgress).toBeGreaterThanOrEqual(ms[3].avgProgress)
+    for (const m of ms) expect(m.complete).toBeLessThanOrEqual(m.total)
+    const series = monthlySeries(evals, asOf)
+    expect(series).toHaveLength(6)
+    for (const p of series) expect(p.onTime).toBeLessThanOrEqual(p.actual)
   })
 })

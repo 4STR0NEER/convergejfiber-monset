@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
-import { X } from 'lucide-react'
+import { Link } from 'react-router'
+import { ArrowRight, X } from 'lucide-react'
 import { diffDays, fmtDate, peso, type ISODate } from '../../domain/dates'
 import { plannedMilestonePct, type PoEval } from '../../domain/status'
 import { currentPtl, MILESTONE_LABEL, MILESTONES } from '../../domain/types'
@@ -124,6 +125,10 @@ export function SidePanel({ ev }: { ev: PoEval }) {
             {ev.ld.clockStopped ? `Clock stopped at PAT on ${fmtDate(po.patDate!)}.` : ev.ld.lateDays ? 'Accruing daily until PAT.' : 'Nothing accrued.'}
           </p>
         </Section>
+
+        <Link to={`/po/${po.id}`} className="flex items-center justify-center gap-1.5 rounded-xl border border-border py-2.5 text-sm font-medium hover:bg-surface-2">
+          Open full PO detail<ArrowRight size={15} />
+        </Link>
 
         {incidents.length > 0 && (
           <Section title="Third-party damage">

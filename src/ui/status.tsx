@@ -6,7 +6,7 @@ import type { Theme } from '../state'
 /** Mirrors the --st-* tokens in theme.css (deck.gl needs raw values). */
 export const STATUS_HEX: Record<Theme, Record<Status, string>> = {
   dark: { COMPLETED: '#8e97ad', ON_TRACK: '#34d399', TRENDING_LATE: '#c084fc', AT_RISK: '#fbbf24', DELAYED: '#fb7185' },
-  light: { COMPLETED: '#64748b', ON_TRACK: '#047857', TRENDING_LATE: '#7e22ce', AT_RISK: '#b45309', DELAYED: '#be123c' },
+  light: { COMPLETED: '#64748b', ON_TRACK: '#15803d', TRENDING_LATE: '#7e22ce', AT_RISK: '#a16207', DELAYED: '#9f1239' }, // validated (dataviz): adjacent CVD + contrast pass
 }
 export const STATUS_VAR: Record<Status, string> = {
   COMPLETED: 'var(--st-completed)', ON_TRACK: 'var(--st-ontrack)', TRENDING_LATE: 'var(--st-trending)', AT_RISK: 'var(--st-atrisk)', DELAYED: 'var(--st-delayed)',

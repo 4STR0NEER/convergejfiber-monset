@@ -5,14 +5,14 @@ import { useLayoutEffect, useRef } from 'react'
 import { NavLink, useLocation } from 'react-router'
 import { animate, motion, useMotionTemplate, useMotionValue, useReducedMotion, useTransform, useVelocity } from 'motion/react'
 
-export interface Tab { to: string; label: string }
+export interface Tab { to: string; label: string; /** Extra path prefixes that belong to this tab. */ also?: string[] }
 
 const LEAD = { type: 'spring', stiffness: 620, damping: 38 } as const
 const TRAIL = { type: 'spring', stiffness: 240, damping: 26, mass: 1.1 } as const
 
 export function NavTabs({ tabs }: { tabs: Tab[] }) {
   const { pathname } = useLocation()
-  const active = Math.max(0, tabs.findIndex(t => (t.to === '/' ? pathname === '/' : pathname.startsWith(t.to))))
+  const active = Math.max(0, tabs.findIndex(t => (t.to === '/' ? pathname === '/' : [t.to, ...(t.also ?? [])].some(p => pathname.startsWith(p)))))
   const wrap = useRef<HTMLDivElement>(null)
   const items = useRef<(HTMLAnchorElement | null)[]>([])
   const reduce = useReducedMotion()

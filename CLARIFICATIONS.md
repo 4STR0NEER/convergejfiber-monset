@@ -5,7 +5,7 @@ Living file. Updated at the end of every phase. Three parts:
 2. **Decisions made** (answered by Monset, with date).
 3. **Assumptions** we made about process and data, so nothing assumed gets mistaken for confirmed.
 
-Last updated: 2026-11-05 (Phase 2)
+Last updated: 2026-11-05 (Phase 3)
 
 ---
 
@@ -32,6 +32,9 @@ Last updated: 2026-11-05 (Phase 2)
 | Q17 | Segments | Can one PO cover several disconnected route pieces, or can one route piece be shared by two POs? | Each drawn segment belongs to exactly one PO, one segment per PO in the seed. Multiple segments per PO already supported. |
 | Q18 | Network nodes | Real location of the core node / NOC and the hub sites? | Mandaue NOC placeholder at 10.3236, 123.9223 plus hubs at city centres. |
 | Q19 | Crew location | Do crews report position only with field updates, or is there a check-in app / vehicle GPS? How often? | Crew pin = location of their latest field update. Map says "last check-in X ago", never implies live GPS. |
+| Q21 | Target vs actual | Manila's month-over-month chart: is "target" the POs whose PTL target PAT falls in the month, and "actual" the PATs accepted in that month (regardless of when they were due)? | Yes to both. We also split actual into on time vs late. |
+| Q22 | Milestone progress | Is portfolio milestone progress a simple average per PO, or weighted by cost or route length? | Simple average per PO; completed POs count as 100%. Plan line is the average PTL-planned % for today. |
+| Q23 | Health score | Does the client want a single 0-100 schedule health number, and is our formula acceptable? | 100 minus points behind plan, minus contractor-attributable late days (max 50). |
 | Q20 | Map provider | Is a free OpenStreetMap basemap acceptable for production, or does Converge have a licensed basemap / GIS server? | OpenFreeMap (no API key), with attribution shown. |
 
 ## 2. Decisions made
@@ -99,3 +102,14 @@ All data is invented. Nothing comes from Converge or any real contractor.
 - **Map encoding:** colour + dash pattern + glyph. Completed = thin, faded solid; On Track = solid; Trending Late = long dash; At Risk = short dash; Delayed = dotted. Mainline is thicker with a glow; sub lines thinner.
 - **Motion:** one intro moment (camera pulls back from the NOC while the network draws outward, anime.js), a pulse travelling along ongoing segments, slow idle orbit that stops on any interaction and resumes after 40 s idle. All of it is off under reduced motion and in 2D mode.
 - **Health score dial** in the side panel uses Kokonut UI's Liquid Gauge (MIT), adapted to read-only.
+
+### Portfolio and PO Detail (Phase 3)
+
+- **Every view follows the shared filters**, including status. The reconciliation chip re-checks 15 totals for whatever is filtered.
+- **On-time rate** = completed POs with zero contractor-attributable late days / completed POs. **Their share of delay** = contractor-attributable late days / (attributable + excused days).
+- **PO register LD column** shows the PO's computed LD whether still accruing or final (accepted late). The "LD exposure" totals only count what is still open or not yet claimed (see Q8).
+- **Route length** shown on PO Detail is the seed's planned length, not measured from the drawn (assumed) geometry.
+- **Status colours (light theme) were re-stepped** after running the dataviz palette validator: At Risk and Delayed were too close for colour-blind and normal vision. Adjacent pairs now pass in both themes; non-adjacent red/green pairs still rely on the glyph and dash pattern, by design.
+- **Chart series:** "Due" is a deliberately muted reference; accepted on time = violet, accepted late = orange (validated for colour-vision separation and contrast in both themes). Every chart has a "View as table".
+- **Map intro and KPI count-up play once per browser session.** Coming back to the Command Center (or arriving via "Show on map") goes straight to the map.
+- **Theme switch** reveals the new theme as a circle from the toggle (adapted from Skiper UI skiper26, free component; attribution required, will go in the README credits).

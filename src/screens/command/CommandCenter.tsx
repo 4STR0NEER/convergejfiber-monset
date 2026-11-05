@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { AnimatePresence, useReducedMotion } from 'motion/react'
-import { Box, Map as MapIcon, RotateCcw, SlidersHorizontal } from 'lucide-react'
+import { Box, Map as MapIcon, RotateCcw } from 'lucide-react'
 import { STATUS_LABEL, STATUSES } from '../../domain/status'
-import { NO_FILTERS, useData, type Filters } from '../../state'
+import { useData } from '../../state'
+import { FilterBar } from '../../ui/FilterBar'
 import { LineSample, StatusGlyph } from '../../ui/status'
 import { HeroMap } from './HeroMap'
 import { KpiStrip } from './KpiStrip'
@@ -19,7 +20,7 @@ export function CommandCenter() {
     <div className="flex min-h-full flex-col md:h-full md:min-h-0">
       <h1 className="sr-only">Command Center</h1>
       <KpiStrip />
-      <FilterBar mode3d={mode3d} setMode3d={setMode3d} onReset={() => setReset(n => n + 1)} />
+      <FilterBar><MapControls mode3d={mode3d} setMode3d={setMode3d} onReset={() => setReset(n => n + 1)} /></FilterBar>
       <div className="relative min-h-[68vh] flex-1 md:min-h-0">
         <HeroMap mode3d={mode3d} reduceMotion={reduce} resetSignal={reset} />
         <Legend />
@@ -29,48 +30,21 @@ export function CommandCenter() {
   )
 }
 
-function FilterBar({ mode3d, setMode3d, onReset }: { mode3d: boolean; setMode3d: (b: boolean) => void; onReset: () => void }) {
-  const { snap, filters, setFilters, evals, matches } = useData()
-  const shown = evals.filter(matches).length
-  const [open, setOpen] = useState(false)
-  const dirty = JSON.stringify(filters) !== JSON.stringify(NO_FILTERS)
-  const sel = (key: keyof Filters, label: string, opts: { id: string; name: string }[]) => (
-    <select aria-label={label} value={filters[key]} onChange={e => setFilters({ ...filters, [key]: e.target.value })}
-      className={`h-8 rounded-lg border bg-surface px-2 text-[13px] transition-colors duration-150
-        ${filters[key] ? 'border-[var(--accent)] text-text' : 'border-border text-muted hover:text-text'}`}>
-      <option value="">All {label.toLowerCase()}</option>
-      {opts.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-    </select>
-  )
+function MapControls({ mode3d, setMode3d, onReset }: { mode3d: boolean; setMode3d: (b: boolean) => void; onReset: () => void }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-border bg-bg px-4 py-2 md:px-6">
-      <button onClick={() => setOpen(o => !o)} aria-expanded={open} aria-controls="map-filters"
-        className="flex h-8 items-center gap-1.5 rounded-lg border border-border px-2.5 text-[13px] md:hidden">
-        <SlidersHorizontal size={14} />Filters{dirty ? ' (on)' : ''}
+    <>
+      <div role="group" aria-label="Map mode" className="flex rounded-lg border border-border p-0.5">
+        {[{ v: true, label: '3D', Icon: Box }, { v: false, label: '2D', Icon: MapIcon }].map(({ v, label, Icon }) => (
+          <button key={label} aria-pressed={mode3d === v} onClick={() => setMode3d(v)}
+            className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors duration-150 ${mode3d === v ? 'bg-surface-2 text-text' : 'text-muted hover:text-text'}`}>
+            <Icon size={13} />{label}
+          </button>
+        ))}
+      </div>
+      <button onClick={onReset} className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-muted hover:text-text">
+        <RotateCcw size={13} />Reset view
       </button>
-      <div id="map-filters" className={`${open ? 'flex' : 'hidden'} w-full flex-wrap gap-2 md:flex md:w-auto`}>
-        {sel('program', 'Programs', snap.programs)}
-        {sel('cluster', 'Clusters', snap.clusters)}
-        {sel('contractor', 'Contractors', snap.contractors)}
-        {sel('category', 'Categories', snap.categories)}
-        {sel('status', 'Statuses', STATUSES.map(s => ({ id: s, name: STATUS_LABEL[s] })))}
-      </div>
-      <span className="text-xs text-muted" aria-live="polite">Showing {shown} of {evals.length}</span>
-      {dirty && <button onClick={() => setFilters(NO_FILTERS)} className="text-xs font-medium text-accent hover:underline">Clear filters</button>}
-      <div className="ml-auto flex items-center gap-1">
-        <div role="group" aria-label="Map mode" className="flex rounded-lg border border-border p-0.5">
-          {[{ v: true, label: '3D', Icon: Box }, { v: false, label: '2D', Icon: MapIcon }].map(({ v, label, Icon }) => (
-            <button key={label} aria-pressed={mode3d === v} onClick={() => setMode3d(v)}
-              className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors duration-150 ${mode3d === v ? 'bg-surface-2 text-text' : 'text-muted hover:text-text'}`}>
-              <Icon size={13} />{label}
-            </button>
-          ))}
-        </div>
-        <button onClick={onReset} className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-muted hover:text-text">
-          <RotateCcw size={13} />Reset view
-        </button>
-      </div>
-    </div>
+    </>
   )
 }
 

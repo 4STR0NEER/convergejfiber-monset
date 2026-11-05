@@ -23,11 +23,15 @@
   --bad: #b91c1c;
   /* Status palette. Never used alone: every status also has a dash pattern and a glyph. */
   --st-completed: #64748b;
-  --st-ontrack: #047857;
+  --st-ontrack: #15803d;
   --st-trending: #7e22ce;
-  --st-atrisk: #b45309;
-  --st-delayed: #be123c;
+  --st-atrisk: #a16207;
+  --st-delayed: #9f1239;
   --on-status: #ffffff;
+  /* Chart series (validated): de-emphasised reference, then two brand series. */
+  --series-ref: #857e94;
+  --series-a: #6d28d9;
+  --series-b: #c2470a;
   --map-veil: rgba(250, 248, 246, 0.9);
   --shadow: 0 1px 2px rgba(21, 18, 28, 0.06), 0 8px 24px -8px rgba(21, 18, 28, 0.14);
   color-scheme: light;
@@ -51,6 +55,9 @@
     --st-atrisk: #fbbf24;
     --st-delayed: #fb7185;
     --on-status: #0d0b14;
+    --series-ref: #7a7290;
+    --series-a: #9a75f0;
+    --series-b: #f2742f;
     --map-veil: rgba(13, 11, 20, 0.88);
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px -12px rgba(0, 0, 0, 0.7);
     color-scheme: dark;
@@ -73,6 +80,9 @@
   --st-atrisk: #fbbf24;
   --st-delayed: #fb7185;
   --on-status: #0d0b14;
+  --series-ref: #7a7290;
+  --series-a: #9a75f0;
+  --series-b: #f2742f;
   --map-veil: rgba(13, 11, 20, 0.88);
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px -12px rgba(0, 0, 0, 0.7);
   color-scheme: dark;
@@ -118,3 +128,6 @@ input, textarea { caret-color: var(--brand-orange); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
 }
+
+/* Theme reveal (see ui/skiper/themeReveal.ts): disable the default cross-fade, the circle does the work. */
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }

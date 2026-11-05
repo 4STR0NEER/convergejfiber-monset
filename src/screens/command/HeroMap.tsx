@@ -42,12 +42,17 @@ const INCIDENT_ICON = svgUrl(`<svg xmlns="http://www.w3.org/2000/svg" width="64"
 
 const hashUnit = (s: string) => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return ((h >>> 0) % 1000) / 1000 }
 
+/** The intro is a once-per-session moment, not something to sit through on every visit. */
+let introPlayed = false
+
 interface Props { mode3d: boolean; reduceMotion: boolean; resetSignal: number }
 
 export function HeroMap({ mode3d, reduceMotion, resetSignal }: Props) {
   const { network, snap, byId, matches, matchesScope, selectedId, select, theme } = useData()
-  const [view, setView] = useState<MapViewState>(reduceMotion ? HOME : { ...HOME, zoom: 14.2, pitch: 62, bearing: -40, longitude: NOC[0], latitude: NOC[1] })
-  const [reveal, setReveal] = useState(reduceMotion ? 1 : 0)
+  // Arriving with a PO already selected ("Show on map"): skip the intro and fly straight to it.
+  const [skipIntro] = useState(() => reduceMotion || !!selectedId || introPlayed)
+  const [view, setView] = useState<MapViewState>(skipIntro ? HOME : { ...HOME, zoom: 14.2, pitch: 62, bearing: -40, longitude: NOC[0], latitude: NOC[1] })
+  const [reveal, setReveal] = useState(skipIntro ? 1 : 0)
   const [time, setTime] = useState(0)
   const [glError, setGlError] = useState(false)
   const lastInteraction = useRef(0)
@@ -78,7 +83,8 @@ export function HeroMap({ mode3d, reduceMotion, resetSignal }: Props) {
 
   // ---------- intro: one hero moment (anime.js) ----------
   useEffect(() => {
-    if (reduceMotion) return
+    if (skipIntro) { orbiting.current = !reduceMotion; return }
+    introPlayed = true
     const cam = { zoom: 14.2, pitch: 62, bearing: -40, longitude: NOC[0], latitude: NOC[1], reveal: 0 }
     const a = animate(cam, {
       zoom: HOME.zoom, pitch: HOME.pitch, bearing: HOME.bearing, longitude: HOME.longitude, latitude: HOME.latitude,
@@ -91,7 +97,7 @@ export function HeroMap({ mode3d, reduceMotion, resetSignal }: Props) {
       onComplete: () => { setReveal(1); orbiting.current = true },
     })
     return () => { a.revert(); r.revert() }
-  }, [reduceMotion])
+  }, [skipIntro])
 
   // ---------- frame loop: pulse + idle orbit ----------
   useEffect(() => {

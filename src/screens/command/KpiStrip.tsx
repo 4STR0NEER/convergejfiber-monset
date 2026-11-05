@@ -9,6 +9,8 @@ import { StatusGlyph, STATUS_VAR } from '../../ui/status'
 
 /** One instrument strip, not nine cards. Counts respect program/cluster/contractor/category filters;
  *  clicking a status or activity toggles it as a filter. */
+let countedUp = false
+
 export function KpiStrip() {
   const { evals, matchesScope, filters, setFilters, snap, settings } = useData()
   const scoped = evals.filter(matchesScope)
@@ -21,7 +23,8 @@ export function KpiStrip() {
   // First paint only: numbers count up and the mix bar fills (part of the intro moment).
   useEffect(() => {
     const scope = createScope({ root, mediaQueries: { reduce: '(prefers-reduced-motion: reduce)' } }).add(self => {
-      if (self?.matches.reduce) return
+      if (self?.matches.reduce || countedUp) return
+      countedUp = true
       root.current!.querySelectorAll<HTMLElement>('[data-count]').forEach((el, i) => {
         const target = { v: 0 }
         const final = Number(el.dataset.count)
