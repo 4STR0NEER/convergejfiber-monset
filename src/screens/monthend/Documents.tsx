@@ -34,10 +34,11 @@ const cell = 'border-b border-zinc-200 py-1.5 pr-2'
 
 export function RecommendationDoc() {
   const { period = '' } = useParams()
-  const { snap } = useData()
+  const { snap, can } = useData()
   const data = useCloseData(period)
   const { close } = useClose(period)
   const charged = (id: string) => !close.waived[id]
+  if (!can('close.run')) return <p className="mx-auto max-w-xl px-6 py-24 text-muted">The LD recommendation is an internal Converge-J Fiber document. Your claim notice is under Month-End Close, step Day 6-10.</p>
   const grand = data.recs.reduce((a, r) => a + r.items.filter(i => charged(i.poId)).reduce((x, i) => x + i.amount, 0), 0)
   return (
     <Letter period={period} title={`Liquidated damages recommendation, ${periodName(period)}`}>

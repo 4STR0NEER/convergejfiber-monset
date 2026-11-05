@@ -58,11 +58,13 @@ function Explainer() {
 }
 
 export function FieldApp({ within }: { within?: HTMLElement | null }) {
-  const { snap, byId, setSnap, settings } = useData()
+  const { snap, byId, setSnap, settings, session, can, signOut } = useData()
   const reduce = useReducedMotion()
+  // Ground team are locked to their own crew; managers can view their contractor's crews, admin any crew.
   const crews = snap.crews
+  const switchable = can('field.switchCrew')
   const busiest = [...crews].sort((a, b) => b.poIds.filter(id => !byId.get(id)?.po.patDate).length - a.poIds.filter(id => !byId.get(id)?.po.patDate).length)[0]
-  const [crewId, setCrewId] = useState(() => read(CREW_KEY) ?? busiest.id)
+  const [crewId, setCrewId] = useState(() => (switchable ? read(CREW_KEY) : session?.crewId) ?? busiest?.id)
   const crew = crews.find(c => c.id === crewId) ?? busiest
   const [simOffline, setSimOffline] = useState(() => read(OFFLINE_KEY) === '1')
   const netOnline = useOnline()
@@ -72,6 +74,8 @@ export function FieldApp({ within }: { within?: HTMLElement | null }) {
   const [sheet, setSheet] = useState<'actions' | 'outbox' | 'menu' | null>(null)
   const onlineRef = useRef(online)
   onlineRef.current = online
+  const closeForm = useCallback(() => setForm(null), [])
+  const closeSheet = useCallback(() => setSheet(null), [])
 
   const flush = useCallback(() => flushOutbox(() => onlineRef.current, setSnap), [setSnap])
   const pending = items.filter(i => i.status !== 'sent')
@@ -80,18 +84,17 @@ export function FieldApp({ within }: { within?: HTMLElement | null }) {
   const lastSent = items.filter(i => i.sentAt).map(i => i.sentAt!).sort().at(-1)
   const sending = items.find(i => i.status === 'sending')
   const now = Date.now()
+  if (!crew) return <p className="p-6 text-sm text-muted">No crew is linked to this account yet. Ask Backbone Build to assign you to a crew.</p>
   const mine = crew.poIds.map(id => byId.get(id)!).filter(Boolean)
   const msp = snap.contractors.find(c => c.id === crew.contractorId)!
   const open = (kind: FormKind, poId = mine[0].po.id) => { setSheet(null); setForm({ kind, poId }) }
-  const closeForm = useCallback(() => setForm(null), [])
-  const closeSheet = useCallback(() => setSheet(null), [])
 
   return (
     <div className="relative min-h-full bg-bg pb-28">
       {/* app bar */}
       <header className="sticky top-0 z-20 border-b border-border bg-bg/95 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur">
         <div className="flex items-center gap-3">
-          <button onClick={() => setSheet('menu')} aria-label="Switch crew and demo settings"
+          <button onClick={() => setSheet('menu')} aria-label="Account and settings"
             className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-semibold text-white" style={{ background: 'var(--brand-gradient)' }}>
             {crew.lead.split(' ').map(w => w[0]).slice(0, 2).join('')}
           </button>
@@ -186,17 +189,22 @@ export function FieldApp({ within }: { within?: HTMLElement | null }) {
         </ul>
       </Sheet>
 
-      <Sheet within={within} open={sheet === 'menu'} title="Crew and demo settings" onClose={closeSheet}>
-        <label className="block text-[13px] font-medium">Signed in as
-          <select value={crew.id} onChange={e => { setCrewId(e.target.value); write(CREW_KEY, e.target.value) }} className="mt-1.5 w-full rounded-xl border border-border bg-bg px-3 py-2.5 text-[15px]">
-            {crews.map(c => <option key={c.id} value={c.id}>{c.lead} · Crew {c.id} · {snap.contractors.find(x => x.id === c.contractorId)?.short}</option>)}
-          </select>
-        </label>
+      <Sheet within={within} open={sheet === 'menu'} title="Account and settings" onClose={closeSheet}>
+        <p className="text-[13px] text-muted">Signed in as <span className="font-medium text-text">{session?.name}</span></p>
+        {switchable && (
+          <label className="mt-3 block text-[13px] font-medium">Viewing crew
+            <select value={crew.id} onChange={e => { setCrewId(e.target.value); write(CREW_KEY, e.target.value) }} className="mt-1.5 w-full rounded-xl border border-border bg-bg px-3 py-2.5 text-[15px]">
+              {crews.map(c => <option key={c.id} value={c.id}>{c.lead} · Crew {c.id} · {snap.contractors.find(x => x.id === c.contractorId)?.short}</option>)}
+            </select>
+          </label>
+        )}
         <label className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-border p-3 pb-3 text-[14px]">
           <span><span className="block font-medium">Simulate no signal</span><span className="text-xs text-muted">Demo: submissions wait in the outbox until you turn this off.</span></span>
           <input type="checkbox" role="switch" checked={simOffline} onChange={e => { setSimOffline(e.target.checked); write(OFFLINE_KEY, e.target.checked ? '1' : '0') }} className="h-6 w-6 accent-[var(--brand-orange)]" />
         </label>
         {!netOnline && <p className="mt-2 text-xs text-[var(--st-atrisk)]">This device is actually offline right now.</p>}
+        <button onClick={signOut} className="mt-4 w-full rounded-xl border border-border py-3 text-[15px] font-medium">Sign out</button>
+        {pending.length > 0 && <p className="mt-2 text-xs text-muted">{pending.length} item{pending.length > 1 ? 's' : ''} still waiting to send stay on this phone and send after the next sign-in.</p>}
         <div className="h-4" />
       </Sheet>
 

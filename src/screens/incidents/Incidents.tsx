@@ -92,7 +92,8 @@ function Chip({ ok, children }: { ok: boolean; children: React.ReactNode }) {
 }
 
 function IncidentDetail({ inc }: { inc: Incident }) {
-  const { snap, setSnap, select } = useData()
+  const { snap, setSnap, select, can } = useData()
+  const editBom = can('incident.bom'), mayAward = can('incident.award')
   const navigate = useNavigate()
   const [bom, setBom] = useState<BomLine[]>(inc.bom)
   const [award, setAward] = useState(inc.permanentRestoration)
@@ -172,7 +173,7 @@ function IncidentDetail({ inc }: { inc: Incident }) {
       </div>
 
       <Panel title="Bill of materials" sub="Temporary and permanent restoration, billed to the responsible party"
-        action={<div className="no-print flex items-center gap-2">
+        action={(editBom || mayAward) && <div className="no-print flex items-center gap-2">
           {saved && !dirty && <span className="text-xs text-muted" role="status">Saved</span>}
           <button disabled={!dirty} onClick={save} className="inline-flex items-center gap-1.5 rounded-lg bg-text px-3 py-1.5 text-[13px] font-medium text-bg disabled:opacity-40"><Save size={14} />Save</button>
         </div>}>
@@ -182,41 +183,41 @@ function IncidentDetail({ inc }: { inc: Incident }) {
             <tbody>
               {bom.map((l, i) => (
                 <tr key={i} className="border-b border-border/60">
-                  <td className="py-1 pr-2"><input aria-label="Item" value={l.item} onChange={e => setLine(i, { item: e.target.value })} className="w-full rounded-md bg-transparent px-1 py-1 outline-none focus:bg-surface-2" /></td>
-                  <td className="py-1 pr-2"><input aria-label="Unit" value={l.unit} onChange={e => setLine(i, { unit: e.target.value })} className="w-14 rounded-md bg-transparent px-1 py-1 outline-none focus:bg-surface-2" /></td>
-                  <td className="py-1 pr-2"><input aria-label="Quantity" type="number" min={0} value={l.qty} onChange={e => setLine(i, { qty: Math.max(0, +e.target.value) })} className="w-20 rounded-md bg-transparent px-1 py-1 text-right outline-none focus:bg-surface-2" /></td>
-                  <td className="py-1 pr-2"><input aria-label="Unit cost" type="number" min={0} value={l.unitCost} onChange={e => setLine(i, { unitCost: Math.max(0, +e.target.value) })} className="w-24 rounded-md bg-transparent px-1 py-1 text-right outline-none focus:bg-surface-2" /></td>
+                  <td className="py-1 pr-2"><input aria-label="Item" disabled={!editBom} value={l.item} onChange={e => setLine(i, { item: e.target.value })} className="w-full rounded-md bg-transparent px-1 py-1 outline-none focus:bg-surface-2" /></td>
+                  <td className="py-1 pr-2"><input aria-label="Unit" disabled={!editBom} value={l.unit} onChange={e => setLine(i, { unit: e.target.value })} className="w-14 rounded-md bg-transparent px-1 py-1 outline-none focus:bg-surface-2" /></td>
+                  <td className="py-1 pr-2"><input aria-label="Quantity" disabled={!editBom} type="number" min={0} value={l.qty} onChange={e => setLine(i, { qty: Math.max(0, +e.target.value) })} className="w-20 rounded-md bg-transparent px-1 py-1 text-right outline-none focus:bg-surface-2" /></td>
+                  <td className="py-1 pr-2"><input aria-label="Unit cost" disabled={!editBom} type="number" min={0} value={l.unitCost} onChange={e => setLine(i, { unitCost: Math.max(0, +e.target.value) })} className="w-24 rounded-md bg-transparent px-1 py-1 text-right outline-none focus:bg-surface-2" /></td>
                   <td className="py-1 pr-2">
-                    <select aria-label="Phase" value={l.phase} onChange={e => setLine(i, { phase: e.target.value as BomLine['phase'] })} className="rounded-md bg-transparent px-1 py-1">
+                    <select aria-label="Phase" disabled={!editBom} value={l.phase} onChange={e => setLine(i, { phase: e.target.value as BomLine['phase'] })} className="rounded-md bg-transparent px-1 py-1">
                       <option value="temporary">Temporary</option><option value="permanent">Permanent</option>
                     </select>
                   </td>
                   <td className="py-1 pr-2 text-right font-medium">{peso(l.qty * l.unitCost)}</td>
-                  <td className="no-print py-1"><button aria-label={`Remove ${l.item}`} onClick={() => setBom(bom.filter((_, j) => j !== i))} className="rounded-md p-1.5 text-muted hover:bg-surface-2 hover:text-text"><Trash2 size={14} /></button></td>
+                  <td className="no-print py-1">{editBom && <button aria-label={`Remove ${l.item}`} onClick={() => setBom(bom.filter((_, j) => j !== i))} className="rounded-md p-1.5 text-muted hover:bg-surface-2 hover:text-text"><Trash2 size={14} /></button>}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <div className="no-print mt-3 flex flex-wrap items-center gap-2">
+        {editBom && <div className="no-print mt-3 flex flex-wrap items-center gap-2">
           <Plus size={14} className="text-muted" />
           <select aria-label="Add a BOM line" value="" onChange={e => { const p = PRESETS[+e.target.value]; if (p) setBom([...bom, { ...p, qty: 1 }]) }} className="h-8 rounded-lg border border-border bg-surface px-2 text-[13px]">
             <option value="">Add a line…</option>
             {PRESETS.map((p, i) => <option key={p.item} value={i}>{p.item} ({p.phase})</option>)}
           </select>
           <button onClick={() => setBom([...bom, { item: 'Other', unit: 'lot', qty: 1, unitCost: 0, phase: 'temporary' }])} className="text-xs text-muted hover:text-text">Blank line</button>
-        </div>
+        </div>}
         <dl className="mt-4 ml-auto max-w-xs space-y-1 text-[13px]">
           <div className="flex justify-between"><dt className="text-muted">Temporary restoration</dt><dd>{peso(t.temporary)}</dd></div>
           <div className="flex justify-between"><dt className="text-muted">Permanent restoration</dt><dd>{peso(t.permanent)}</dd></div>
           <div className="flex justify-between border-t border-border pt-1 font-semibold"><dt>Total claim</dt><dd>{peso(t.total)}</dd></div>
         </dl>
         <fieldset className="mt-4 border-t border-border pt-4">
-          <legend className="text-[13px] font-medium">Permanent restoration</legend>
+          <legend className="text-[13px] font-medium">Permanent restoration{!mayAward && <span className="ml-2 font-normal text-muted">decided by Converge-J Fiber</span>}</legend>
           <div className="mt-2 flex flex-wrap gap-2 text-[13px]">
             {([['same-contractor', `Already awarded to ${msp}`], ['for-award', 'Still for award']] as const).map(([v, label]) => (
               <label key={v} className={`cursor-pointer rounded-xl border px-3 py-2 ${award === v ? 'border-[var(--accent)] bg-surface-2 font-semibold' : 'border-border'}`}>
-                <input type="radio" name="award" checked={award === v} onChange={() => setAward(v)} className="sr-only" />{label}
+                <input type="radio" name="award" disabled={!mayAward} checked={award === v} onChange={() => setAward(v)} className="sr-only" />{label}
               </label>
             ))}
           </div>

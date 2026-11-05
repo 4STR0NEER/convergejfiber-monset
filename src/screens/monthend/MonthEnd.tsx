@@ -38,7 +38,7 @@ export function useCloseData(period: string) {
 }
 
 export function MonthEnd() {
-  const { snap, settings } = useData()
+  const { snap, settings, can } = useData()
   const navigate = useNavigate()
   const params = useParams()
   const current = addMonths(monthOf(snap.asOf), -1)
@@ -87,9 +87,9 @@ export function MonthEnd() {
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-5 py-4">
             <p className="text-[13px] text-muted">
               {done(sel) ? (close.steps[sel] ? `Done ${new Date(close.steps[sel]!.doneAt).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })} by ${close.steps[sel]!.by}.` : 'Done before the tracker went live.')
-                : `Due ${fmtDate(schedule.find(s => s.key === sel)!.end)}${schedule.find(s => s.key === sel)!.end < snap.asOf ? ' (overdue)' : ''}.`}
+                : `Due ${fmtDate(schedule.find(s => s.key === sel)!.end)}${schedule.find(s => s.key === sel)!.end < snap.asOf ? ' (overdue)' : ''}.${can('close.run') ? '' : ' Run by Converge-J Fiber Backbone Build / PMO.'}`}
             </p>
-            {!done(sel) && <button onClick={() => markDone(sel)} className="inline-flex items-center gap-1.5 rounded-lg bg-text px-4 py-2 text-[13px] font-semibold text-bg"><Check size={15} />Mark “{CLOSE_STEPS.find(s => s.key === sel)!.label.split(' ').slice(0, 3).join(' ')}…” done</button>}
+            {!done(sel) && can('close.run') && <button onClick={() => markDone(sel)} className="inline-flex items-center gap-1.5 rounded-lg bg-text px-4 py-2 text-[13px] font-semibold text-bg"><Check size={15} />Mark “{CLOSE_STEPS.find(s => s.key === sel)!.label.split(' ').slice(0, 3).join(' ')}…” done</button>}
           </div>
         </div>
       )}
@@ -223,7 +223,8 @@ function Fallout({ data }: { data: Data }) {
 }
 
 function Gap({ data, close, update }: { data: Data; close: MonthClose; update: (fn: (c: MonthClose) => MonthClose) => void }) {
-  const { snap, settings } = useData()
+  const { snap, settings, can } = useData()
+  const run = can('close.run')
   const reviewed = data.fallout.filter(f => close.gap[f.ev.po.id]?.reviewed).length
   const draft = (f: FalloutItem) => draftGapAnalysis(f, snap.updates, settings).lines.join('\n')
   const setGap = (id: string, p: Partial<{ text: string; reviewed: boolean }>, f: FalloutItem) =>
@@ -238,11 +239,11 @@ function Gap({ data, close, update }: { data: Data; close: MonthClose; update: (
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-[13px]"><span className="font-mono text-xs text-muted">{f.ev.po.id}</span> · <span className="font-medium">{f.ev.po.title}</span> · {snap.contractors.find(c => c.id === f.ev.po.contractorId)?.short} · {STATUS_LABEL[f.ev.status]}</p>
                 <label className="flex items-center gap-2 text-[13px]">
-                  <input type="checkbox" checked={!!g?.reviewed} onChange={e => setGap(f.ev.po.id, { reviewed: e.target.checked }, f)} className="h-4 w-4 accent-[var(--brand-orange)]" />
+                  <input type="checkbox" disabled={!run} checked={!!g?.reviewed} onChange={e => setGap(f.ev.po.id, { reviewed: e.target.checked }, f)} className="h-4 w-4 accent-[var(--brand-orange)]" />
                   Reviewed with contractor
                 </label>
               </div>
-              <textarea aria-label={`Gap analysis for ${f.ev.po.id}`} defaultValue={g?.text ?? draft(f)} rows={(g?.text ?? draft(f)).split(String.fromCharCode(10)).length + 1}
+              <textarea aria-label={`Gap analysis for ${f.ev.po.id}`} defaultValue={g?.text ?? draft(f)} rows={(g?.text ?? draft(f)).split(String.fromCharCode(10)).length + 1} readOnly={!run}
                 onBlur={e => e.target.value !== (g?.text ?? draft(f)) && setGap(f.ev.po.id, { text: e.target.value }, f)}
                 className="mt-2 w-full rounded-lg border border-border bg-bg p-3 text-[13px] leading-relaxed outline-none focus:border-[var(--accent)]" />
             </li>
@@ -254,13 +255,14 @@ function Gap({ data, close, update }: { data: Data; close: MonthClose; update: (
 }
 
 function Recommend({ period, data, close, update }: { period: string; data: Data; close: MonthClose; update: (fn: (c: MonthClose) => MonthClose) => void }) {
-  const { snap } = useData()
+  const { snap, can } = useData()
+  const run = can('close.run')
   const [waiving, setWaiving] = useState<string | null>(null)
   const [reason, setReason] = useState('')
   const total = data.recs.reduce((a, r) => a + r.items.filter(i => !close.waived[i.poId]).reduce((x, i) => x + i.amount, 0), 0)
   return (
     <Panel title="LD recommendations to PMO" sub={`Only contractor-attributable days are charged · ${peso(total)} across ${data.recs.length} contractors`}
-      action={<Link to={`/month-end/${period}/recommendation`} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-[13px] hover:bg-surface-2"><FileText size={14} />Open document</Link>}>
+      action={run && <Link to={`/month-end/${period}/recommendation`} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-[13px] hover:bg-surface-2"><FileText size={14} />Open document</Link>}>
       <div className="grid gap-4 lg:grid-cols-2">
         {data.recs.map(r => {
           const sub = r.items.filter(i => !close.waived[i.poId]).reduce((a, i) => a + i.amount, 0)
@@ -277,7 +279,7 @@ function Recommend({ period, data, close, update }: { period: string; data: Data
                       <span className={close.waived[i.poId] ? 'text-muted line-through' : ''}><span className="font-mono text-xs">{i.poId}</span> · {i.lateDays} day{i.lateDays === 1 ? '' : 's'} · {i.weeks} wk</span>
                       <span className="flex items-center gap-3">
                         <span className={close.waived[i.poId] ? 'text-muted line-through' : ''}>{peso(i.amount)}</span>
-                        {close.waived[i.poId]
+                        {!run ? null : close.waived[i.poId]
                           ? <button onClick={() => update(c => { const w = { ...c.waived }; delete w[i.poId]; return { ...c, waived: w } })} className="text-xs text-accent hover:underline">Charge</button>
                           : <button onClick={() => { setWaiving(i.poId); setReason('') }} className="text-xs text-muted hover:text-text">Waive…</button>}
                       </span>
@@ -303,7 +305,8 @@ function Recommend({ period, data, close, update }: { period: string; data: Data
 }
 
 function Notices({ period, data, close, update }: { period: string; data: Data; close: MonthClose; update: (fn: (c: MonthClose) => MonthClose) => void }) {
-  const { snap } = useData()
+  const { snap, can } = useData()
+  const run = can('close.run'), mayAck = can('close.acknowledge')
   const [acking, setAcking] = useState<{ id: string; mode: 'ack' | 'dispute' } | null>(null)
   const [name, setName] = useState('')
   const recs = data.recs.map(r => ({ ...r, amount: r.items.filter(i => !close.waived[i.poId]).reduce((a, i) => a + i.amount, 0) })).filter(r => r.amount > 0)
@@ -339,8 +342,8 @@ function Notices({ period, data, close, update }: { period: string; data: Data; 
                   <td className={`${td} whitespace-nowrap text-right`}>
                     <Link to={`/month-end/${period}/notice/${r.contractorId}`} className="mr-3 text-xs text-muted hover:text-text">Open notice</Link>
                     {!n.sentAt
-                      ? <button onClick={() => setNotice(r.contractorId, { sentAt: new Date().toISOString() })} className="inline-flex items-center gap-1 rounded-lg bg-text px-2.5 py-1 text-xs font-medium text-bg"><Send size={12} />Issue</button>
-                      : !n.ack && <>
+                      ? run && <button onClick={() => setNotice(r.contractorId, { sentAt: new Date().toISOString() })} className="inline-flex items-center gap-1 rounded-lg bg-text px-2.5 py-1 text-xs font-medium text-bg"><Send size={12} />Issue</button>
+                      : !n.ack && mayAck && <>
                         <button onClick={() => { setAcking({ id: r.contractorId, mode: 'ack' }); setName('') }} className="mr-2 text-xs font-medium text-accent">Record ack</button>
                         <button onClick={() => { setAcking({ id: r.contractorId, mode: 'dispute' }); setName('') }} className="text-xs text-muted">Dispute</button>
                       </>}

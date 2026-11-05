@@ -5,7 +5,7 @@ Living file. Updated at the end of every phase. Three parts:
 2. **Decisions made** (answered by Monset, with date).
 3. **Assumptions** we made about process and data, so nothing assumed gets mistaken for confirmed.
 
-Last updated: 2026-11-06 (after Phase 6: phone view)
+Last updated: 2026-11-06 (sign-in and roles)
 
 ---
 
@@ -49,6 +49,10 @@ Last updated: 2026-11-06 (after Phase 6: phone view)
 | Q34 | Finance | Is claimed LD deducted from the contractor's next payment? Should the system hand off to finance/SAP? | Out of scope; the notice is the hand-off. |
 | Q35 | Settings access | Who may change LD rate, cap, reason codes and weights? Is an audit trail needed? | Any user can change them; changes apply to every screen at once. No audit trail yet. |
 | Q36 | Route import | Can the client share one sample KMZ early, so we can confirm where PO numbers sit and how mainline vs distribution lines are marked? | Import accepts KMZ/KML/GeoJSON and matches by ExtendedData PO / PO_NO / WO or the Placemark name; "main", "backbone" or "ring" in the name = mainline. |
+| Q37 | Converge roles | Should Converge-J Fiber staff be split further, e.g. Backbone PMs (follow-up, gap analyses) vs PMO (fallout list, notices) vs leadership (read-only) vs system admin (settings)? | One Admin role for all Converge-J Fiber staff. |
+| Q38 | Contractor visibility | May contractor managers see their LD exposure live, before a notice is issued? May they see anonymised benchmarks against other MSPs? | They see their own live LD and scorecard; nothing about other contractors. |
+| Q39 | Ground accounts | Does every lineman get an account, or only crew leads? Can one phone be shared by a crew? | One account per crew lead. A shared phone keeps its unsent outbox across sign-ins. |
+| Q40 | Accounts | Who creates and removes accounts (contractor staff change often)? Should Converge staff sign in with Google Workspace or Microsoft? | Demo accounts only. Live: admin invites users; SSO for Converge staff, email + password for contractors. |
 
 ## 2. Decisions made
 
@@ -64,6 +68,7 @@ Last updated: 2026-11-06 (after Phase 6: phone view)
 | 2026-11-05 | Own GitHub repo, pushed after each phase. |
 | 2026-11-05 | Command Center defaults to the **dark** theme; light theme via toggle (remembered per browser). |
 | 2026-11-05 | "Wedge" and "fluid" motion goes on the **main nav tabs**. Motion Studio not installed. |
+| 2026-11-06 | **Three roles**: Admin (Converge-J Fiber), Contractor manager (one MSP), Ground team (Field App, own crew). |
 | 2026-11-06 | On phones the Command Center opens as a **list, not the map**: people on the go should not have to pinch and pan. The map is one tap away. |
 
 ## 3. Assumptions
@@ -166,3 +171,13 @@ All data is invented. Nothing comes from Converge or any real contractor.
 - Each card shows status, the first plain-language reason, open blockers, days late or to target, and LD, and opens the PO detail page.
 - **Open map** loads the map only on demand (the map code is not even downloaded until then), in 2D by default on phones, with "Back to list". Arriving from "Show on map" opens the map straight away.
 - Crews still use the Field App (`/field`), which has no map; this list is for supervisors and PMs on site.
+
+### Sign-in and roles (2026-11-06)
+
+- **Sign-in is simulated** with demo accounts (password `demo1234`) and checked in the browser. It demonstrates roles; it is not security. Supabase Auth and row-level security replace it.
+- **Admin** sees and does everything. **Contractor managers** see only their contractor's POs, routes, crews, incidents and scorecard; the contractor filter disappears because there is only one. **Ground team** get only the Field App, locked to their crew.
+- Managers **can**: read their gap analyses (read-only), see and print their own LD notice, record acknowledgment or a dispute, edit the BOM on their incidents, view their crews' Field App.
+- Managers **cannot**: open Settings, run or mark close steps, edit gap analyses, waive, issue notices, decide whether permanent restoration is awarded, or open the internal LD recommendation memo.
+- A screen a role may not open sends the user to their home screen. A deep link opened while signed out returns to that page after sign-in if the role allows it.
+- The QR signing page for responsible parties needs no account.
+- The Field App's offline outbox belongs to the phone, not the user: items waiting to send survive sign-out and go out after the next sign-in (so nothing typed in the field is lost).

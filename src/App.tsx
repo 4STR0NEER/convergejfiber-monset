@@ -1,6 +1,8 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
-import { Route, Routes, useLocation } from 'react-router'
-import { Moon, Sun } from 'lucide-react'
+import { Navigate, Route, Routes, useLocation } from 'react-router'
+import { LogOut, Moon, Sun } from 'lucide-react'
+import { canVisit, ROLE_HOME, ROLE_LABEL } from './domain/access'
+import { SignIn } from './screens/auth/SignIn'
 import { useData } from './state'
 import { ErrorBoundary, ScreenLoading } from './ui/ErrorBoundary'
 import { NavTabs, type Tab } from './ui/NavTabs'
@@ -32,8 +34,12 @@ const TABS: Tab[] = [
 
 export default function App() {
   const { pathname } = useLocation()
-  // The signing page is for an outside party: no internal navigation.
+  const { session } = useData()
+  // The signing page is for an outside party: no account, no internal navigation.
   if (pathname.startsWith('/ack/')) return <main className="h-full overflow-y-auto"><Suspense fallback={<ScreenLoading />}><Routes><Route path="/ack/:id" element={<Ack />} /></Routes></Suspense></main>
+  if (!session) return <div className="h-full overflow-y-auto"><SignIn /></div>
+  // A role that may not open this screen is sent to its own home screen.
+  if (!canVisit(session.role, pathname)) return <Navigate to={ROLE_HOME[session.role]} replace />
   return (
     <div className="flex h-full flex-col">
       <a href="#main" className="sr-only z-50 rounded-lg bg-text px-3 py-2 text-sm font-medium text-bg focus:not-sr-only focus:absolute focus:left-3 focus:top-3">Skip to content</a>
@@ -66,7 +72,8 @@ export default function App() {
 }
 
 function Header() {
-  const { theme, setTheme } = useData()
+  const { theme, setTheme, session } = useData()
+  const tabs = TABS.filter(t => canVisit(session!.role, t.to))
   return (
     <header className="app-chrome relative z-30 flex items-center gap-4 border-b border-border bg-bg px-4 md:px-6">
       <a href="/" className="flex shrink-0 items-center gap-2.5 py-3" aria-label="Converge-J Fiber Backbone Command, home">
@@ -76,13 +83,34 @@ function Header() {
           <span className="block text-[11px] text-muted">Backbone Command</span>
         </span>
       </a>
-      <div className="min-w-0 flex-1"><NavTabs tabs={TABS} /></div>
-      <LiveStamp />
+      <div className="min-w-0 flex-1"><NavTabs tabs={tabs} /></div>
+      {session!.role !== 'ground' && <LiveStamp />}
       <button onClick={e => { const el = e.currentTarget; revealTheme(() => setTheme(theme === 'dark' ? 'light' : 'dark'), el) }} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
         className="rounded-lg p-2 text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-text">
         {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
       </button>
+      <UserMenu />
     </header>
+  )
+}
+
+function UserMenu() {
+  const { session, signOut, snap } = useData()
+  const s = session!
+  const org = s.contractorId ? snap.contractors.find(c => c.id === s.contractorId)?.name ?? s.contractorId : 'Converge-J Fiber'
+  return (
+    <details className="relative shrink-0">
+      <summary aria-label={`Account: ${s.name}, ${ROLE_LABEL[s.role]}`} className="grid h-8 w-8 cursor-pointer list-none place-items-center rounded-full text-[11px] font-semibold text-white" style={{ background: 'var(--brand-gradient)' }}>
+        {s.name.split(' ').map(w => w[0]).slice(0, 2).join('')}
+      </summary>
+      <div className="absolute right-0 z-40 mt-2 w-64 rounded-xl border border-border bg-surface p-3 text-[13px] shadow-[var(--shadow)]">
+        <p className="font-semibold">{s.name}</p>
+        <p className="text-xs text-muted">{s.email}</p>
+        <p className="mt-2 inline-block rounded-full border border-border px-2 py-0.5 text-[11px] font-medium">{ROLE_LABEL[s.role]}{s.crewId ? ` · Crew ${s.crewId}` : ''}</p>
+        <p className="mt-1 text-xs text-muted">{org}</p>
+        <button onClick={signOut} className="mt-3 flex w-full items-center gap-2 rounded-lg border border-border px-3 py-2 font-medium hover:bg-surface-2"><LogOut size={14} />Sign out</button>
+      </div>
+    </details>
   )
 }
 

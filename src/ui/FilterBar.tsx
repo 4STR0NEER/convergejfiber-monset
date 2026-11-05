@@ -26,7 +26,7 @@ export function FilterBar({ children }: { children?: ReactNode }) {
       <div id="shared-filters" className={`${open ? 'flex' : 'hidden'} w-full flex-wrap gap-2 md:flex md:w-auto`}>
         {sel('program', 'Programs', snap.programs)}
         {sel('cluster', 'Clusters', snap.clusters)}
-        {sel('contractor', 'Contractors', snap.contractors)}
+        {snap.contractors.length > 1 && sel('contractor', 'Contractors', snap.contractors)}
         {sel('category', 'Categories', snap.categories)}
         {sel('status', 'Statuses', STATUSES.map(s => ({ id: s, name: STATUS_LABEL[s] })))}
       </div>

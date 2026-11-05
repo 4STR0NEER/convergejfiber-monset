@@ -32,7 +32,7 @@ The seed is deterministic (fixed random seed) and its dates are relative to toda
 | `/incidents` | Third-party damage claims: report, signed undertaking (or QR for the responsible party to sign), BOM with temporary/permanent totals, award flag, printable claim packet. |
 | `/field` | Crew app (installable PWA, works offline): my POs, proof-first progress updates, blockers with reason codes, damage reports. On desktop it shows inside a phone frame. |
 | `/settings` | LD rate and cap, risk thresholds, milestone weights, reason codes, holidays, brand colours, **route data import**, with a live what-if before saving. |
-| `/ack/:id` | Page the responsible party opens from the QR code to sign the Incident Acknowledgment and Undertaking. |
+| `/ack/:id` | Page the responsible party opens from the QR code to sign the Incident Acknowledgment and Undertaking (no account needed). |
 
 ## Business rules
 
@@ -133,6 +133,23 @@ create table settings (id int primary key default 1, value jsonb not null);
 ```
 
 Row-level security to plan for: MSP users see only their contractor's POs; crews insert updates only for POs they are assigned; PMO/Backbone roles see everything and run the close; settings editable by admins only (see Q14, Q30, Q35).
+
+## Sign-in and roles
+
+The prototype signs in with **demo accounts** (password `demo1234`), listed on the sign-in screen. It is simulated in the browser, so it shows how roles behave but is **not security**; the live system uses Supabase Auth.
+
+| Role | Who | Sees | Can do |
+|---|---|---|---|
+| Admin | Converge-J Fiber Backbone Build / PMO (`admin@convergej.demo`) | Everything | Everything: settings and route files, run the month-end close, waive, issue notices, decide incident awards |
+| Contractor manager | One per MSP (`pm.mcc@convergej.demo`, ...) | Only their contractor's POs, routes, crews, incidents, scorecard and LD | Edit the BOM on their incidents, acknowledge or dispute their LD notice, view their crews in the Field App. No Settings; the LD recommendation memo is internal. |
+| Ground team | Linemen / crew leads (`jun.cabahug@convergej.demo`, ...) | Field App only, their own crew | Progress updates, blockers, damage reports |
+
+The rules live in `src/domain/access.ts` (tested): `can(session, action)`, `canVisit(role, path)` and `scopeSnapshot()`, which trims the data to what the user may see before any screen gets it. `src/data/auth.ts` holds the demo sign-in. With Supabase:
+
+- `signIn` / `signOut` / `getSession` become Supabase Auth calls (email + password, or Google / Microsoft SSO for Converge staff).
+- A `profiles` table stores `role`, `contractor_id` and `crew_id` per user.
+- `scopeSnapshot` becomes row-level security, e.g. `pos`: `using (auth_role() = 'admin' or contractor_id = auth_contractor())`; `field_updates`: insert only where the PO is assigned to the user's crew; `settings`: write only for admin.
+- The QR signing page stays public but takes a short-lived signed token.
 
 ## Offline and PWA
 
