@@ -32,6 +32,7 @@ Last updated: 2026-11-06 (after Phase 6: phone view)
 | Q17 | Segments | Can one PO cover several disconnected route pieces, or can one route piece be shared by two POs? | Each drawn segment belongs to exactly one PO, one segment per PO in the seed. Multiple segments per PO already supported. |
 | Q18 | Network nodes | Real location of the core node / NOC and the hub sites? | Mandaue NOC placeholder at 10.3236, 123.9223 plus hubs at city centres. |
 | Q19 | Crew location | Do crews report position only with field updates, or is there a check-in app / vehicle GPS? How often? | Crew pin = location of their latest field update. Map says "last check-in X ago", never implies live GPS. |
+| Q20 | Map provider | Is a free OpenStreetMap basemap acceptable for production, or does Converge have a licensed basemap / GIS server? | OpenFreeMap (no API key), with attribution shown. |
 | Q21 | Target vs actual | Manila's month-over-month chart: is "target" the POs whose PTL target PAT falls in the month, and "actual" the PATs accepted in that month (regardless of when they were due)? | Yes to both. We also split actual into on time vs late. |
 | Q22 | Milestone progress | Is portfolio milestone progress a simple average per PO, or weighted by cost or route length? | Simple average per PO; completed POs count as 100%. Plan line is the average PTL-planned % for today. |
 | Q23 | Health score | Does the client want a single 0-100 schedule health number, and is our formula acceptable? | 100 minus points behind plan, minus contractor-attributable late days (max 50). |
@@ -48,7 +49,6 @@ Last updated: 2026-11-06 (after Phase 6: phone view)
 | Q34 | Finance | Is claimed LD deducted from the contractor's next payment? Should the system hand off to finance/SAP? | Out of scope; the notice is the hand-off. |
 | Q35 | Settings access | Who may change LD rate, cap, reason codes and weights? Is an audit trail needed? | Any user can change them; changes apply to every screen at once. No audit trail yet. |
 | Q36 | Route import | Can the client share one sample KMZ early, so we can confirm where PO numbers sit and how mainline vs distribution lines are marked? | Import accepts KMZ/KML/GeoJSON and matches by ExtendedData PO / PO_NO / WO or the Placemark name; "main", "backbone" or "ring" in the name = mainline. |
-| Q20 | Map provider | Is a free OpenStreetMap basemap acceptable for production, or does Converge have a licensed basemap / GIS server? | OpenFreeMap (no API key), with attribution shown. |
 
 ## 2. Decisions made
 
