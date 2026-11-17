@@ -14,6 +14,8 @@ export interface Session {
   contractorId?: string
   /** Ground team belong to one crew. */
   crewId?: string
+  /** From the roles table when signed in against the server; demo accounts fall back to DEFAULT_ROLES. */
+  permissions?: Action[]
 }
 
 export type Action =
@@ -26,19 +28,41 @@ export type Action =
   | 'field.switchCrew'   // act as another crew in the Field App
   | 'po.create'          // add a PO / WO with its PTL and route
   | 'network.edit'       // add, rename or remove network nodes
+  | 'notice.issue'       // send LD claim notices to contractors
+  | 'users.manage'       // invite users, set their role
+  | 'audit.read'         // read the audit log
+  | 'change.approve'     // approve change requests (Phase 8)
 
-const RULES: Record<Action, Role[]> = {
-  'settings.edit': ['admin'],
-  'close.run': ['admin'],
-  'close.acknowledge': ['admin', 'manager'],
-  'incident.bom': ['admin', 'manager'],
-  'incident.award': ['admin'],
-  'field.submit': ['admin', 'manager', 'ground'],
-  'field.switchCrew': ['admin', 'manager'],
-  'po.create': ['admin'],
-  'network.edit': ['admin'],
+/** Permission flag (column of the roles table) for each action. */
+export const PERMISSION_FLAG: Record<Action, string> = {
+  'settings.edit': 'can_edit_settings',
+  'close.run': 'can_run_close',
+  'notice.issue': 'can_issue_notices',
+  'close.acknowledge': 'can_acknowledge_notices',
+  'incident.bom': 'can_edit_bom',
+  'incident.award': 'can_award_incidents',
+  'field.submit': 'can_submit_field',
+  'field.switchCrew': 'can_switch_crew',
+  'po.create': 'can_create_pos',
+  'network.edit': 'can_edit_network',
+  'users.manage': 'can_manage_users',
+  'audit.read': 'can_read_audit',
+  'change.approve': 'can_approve_change_requests',
 }
-export const can = (s: Session | null, a: Action) => !!s && RULES[a].includes(s.role)
+const ALL = Object.keys(PERMISSION_FLAG) as Action[]
+
+/** Roles as data. Mirrors the rows seeded in supabase/migrations (a test checks they match). */
+export interface RoleDef { id: Role; label: string; scope: 'all' | 'contractor' | 'crew'; permissions: Action[] }
+export const DEFAULT_ROLES: Record<Role, RoleDef> = {
+  admin: { id: 'admin', label: ROLE_LABEL.admin, scope: 'all', permissions: ALL },
+  manager: { id: 'manager', label: ROLE_LABEL.manager, scope: 'contractor', permissions: ['close.acknowledge', 'incident.bom', 'field.submit', 'field.switchCrew'] },
+  ground: { id: 'ground', label: ROLE_LABEL.ground, scope: 'crew', permissions: ['field.submit'] },
+}
+
+/** A roles-table row (permission flags as booleans) -> the actions it allows. */
+export const permissionsFromFlags = (row: Record<string, unknown>): Action[] => ALL.filter(a => row[PERMISSION_FLAG[a]] === true)
+
+export const can = (s: Session | null, a: Action) => !!s && (s.permissions ?? DEFAULT_ROLES[s.role].permissions).includes(a)
 
 /** Screens per role. Ground team only get the Field App. */
 const SCREENS: Record<Role, string[]> = {

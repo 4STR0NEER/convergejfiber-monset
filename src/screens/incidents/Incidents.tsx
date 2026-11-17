@@ -102,7 +102,7 @@ function IncidentDetail({ inc }: { inc: Incident }) {
   useEffect(() => { if (dirty) setSaved(false) }, [dirty])
   const t = bomTotals(bom)
   const msp = snap.contractors.find(c => c.id === inc.witnessingMsp)?.name ?? inc.witnessingMsp
-  const ackUrl = `${location.origin}/ack/${inc.id}`
+  const ackUrl = `${location.origin}/ack/${inc.id}${inc.ackToken ? `?t=${inc.ackToken}` : ''}`
   const dur = hours(inc.receivedAt, inc.restoredAt)
   const ts = (v?: string) => (v ? `${fmtDate(v.slice(0, 10))} ${v.slice(11, 16)}` : '–')
   const setLine = (i: number, p: Partial<BomLine>) => setBom(bom.map((l, j) => (j === i ? { ...l, ...p } : l)))
@@ -165,7 +165,7 @@ function IncidentDetail({ inc }: { inc: Incident }) {
               <div className="max-w-xs text-[13px]">
                 <p className="font-semibold">Not signed yet</p>
                 <p className="mt-1 text-muted">The responsible party scans this and signs on their own phone. No account needed.</p>
-                <Link to={`/ack/${inc.id}`} className="no-print mt-2 inline-block text-xs font-medium text-accent hover:underline">Open the signing page</Link>
+                <Link to={`/ack/${inc.id}${inc.ackToken ? `?t=${inc.ackToken}` : ''}`} className="no-print mt-2 inline-block text-xs font-medium text-accent hover:underline">Open the signing page</Link>
               </div>
             </div>
           )}

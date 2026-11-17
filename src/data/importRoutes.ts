@@ -3,7 +3,7 @@
 // Matching rule (assumed until we see real files): a LineString's PO number comes from an ExtendedData
 // field named PO / PO_NO / WO, or else from the first 10-digit / WO-number pattern in the Placemark name.
 import type { Network } from '../domain/types'
-import { parseNetwork } from './repo'
+import { parseNetwork } from './network'
 
 type FC = { type: 'FeatureCollection'; features: { type: 'Feature'; geometry: { type: string; coordinates: unknown }; properties: Record<string, unknown> }[] }
 

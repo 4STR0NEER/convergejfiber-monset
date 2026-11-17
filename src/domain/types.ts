@@ -118,6 +118,8 @@ export interface Incident {
   undertaking?: { name: string; position: string; signature: string; at: Timestamp; via: 'crew-phone' | 'qr-link' }
   blotterPhotoId?: string
   reportedByCrew?: string
+  /** Secret in the QR signing link (server only; demo links work without it). */
+  ackToken?: string
 }
 
 export interface Settings {

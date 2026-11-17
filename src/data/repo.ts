@@ -1,14 +1,13 @@
-// Data access seam. UI only talks to `Repository`; swap LocalRepo for a SupabaseRepo later.
+// Data access seam. UI only talks to `Repository`: LocalRepo (demo mode) or SupabaseRepo.
 import { get, set } from 'idb-keyval'
 import { DEFAULT_SETTINGS } from '../domain/config'
 import { applySubmission, type Submission } from '../domain/field'
 import { emptyClose, type MonthClose } from '../domain/monthEnd'
 import { todayManila } from '../domain/dates'
-import { pointAlong } from '../domain/geo'
-import { weightedProgress } from '../domain/status'
-import type { Hub, Incident, LngLat, Network, PO, Segment, Settings, Snapshot } from '../domain/types'
-import { generateSeed } from './seed'
-import networkJson from './network.geo.json'
+import type { Hub, Incident, Network, PO, Segment, Settings, Snapshot } from '../domain/types'
+import { ASSUMED_SOURCE, assumedNetwork, placeOnRoutes } from './network'
+import { generateSeed, manilaIso } from './seed'
+import { DEMO } from './supabase'
 
 export interface Repository {
   getSnapshot(): Promise<Snapshot>
@@ -29,7 +28,15 @@ export interface Repository {
   removeHub(id: string): Promise<void>
   getClose(period: string): Promise<MonthClose>
   saveClose(c: MonthClose): Promise<void>
+  /** QR signing page: the incident summary, for whoever holds the link (token checked on the server). */
+  getAck(id: string, token: string): Promise<AckView | null>
+  signAck(id: string, token: string, u: { name: string; position: string; signature: string }): Promise<boolean>
+  /** Live changes from other users (server only). Returns an unsubscribe function. */
+  subscribe?(onChange: () => void): () => void
 }
+
+/** What the signing page may show a third party. */
+export interface AckView { id: string; responsibleParty: string; receivedAt: string; faultLocation: string; affectedLink: string; description: string; bom: Incident['bom']; signed: boolean }
 
 // ponytail: local "server" = IndexedDB log replayed over the deterministic seed. Supabase replaces it.
 const APPLIED_KEY = 'cjf.applied.v1'
@@ -40,37 +47,15 @@ const EDITS_KEY = 'cjf.network.edits.v1'
 interface NetworkEdits { segments: Segment[]; hubs: Hub[]; removedHubs: string[] }
 const NO_EDITS: NetworkEdits = { segments: [], hubs: [], removedHubs: [] }
 
-/** GeoJSON FeatureCollection (assumed or imported routes) -> Network. */
-export function parseNetwork(fc: { features: { geometry: { type: string; coordinates: unknown }; properties: Record<string, unknown> }[] }): Network {
-  const segments: Network['segments'] = []
-  const hubs: Network['hubs'] = []
-  for (const f of fc.features) {
-    const p = f.properties
-    if (f.geometry.type === 'LineString' && p.poId) {
-      segments.push({ segmentId: String(p.segmentId), poId: String(p.poId), tier: p.tier === 'mainline' ? 'mainline' : 'sub', corridor: String(p.corridor ?? ''), path: f.geometry.coordinates as LngLat[] })
-    } else if (f.geometry.type === 'Point' && p.kind === 'node') {
-      hubs.push({ id: String(p.id), name: String(p.name), coord: f.geometry.coordinates as LngLat, core: !!p.core })
-    }
-  }
-  return { segments, hubs }
-}
-
-/** Small deterministic offset (about 30 m) so stacked pins don't overlap exactly. */
-const nudge = ([lng, lat]: LngLat, key: string): LngLat => {
-  let h = 0
-  for (const c of key) h = (h * 31 + c.charCodeAt(0)) | 0
-  return [lng + ((h % 100) / 100 - 0.5) * 0.0006, lat + (((h >> 8) % 100) / 100 - 0.5) * 0.0006]
-}
-
 export class LocalRepo implements Repository {
   private snap?: Snapshot
   private network?: Network
-  private source = 'Assumed routes (network.geo.json)'
+  private source = ASSUMED_SOURCE
 
   async getNetwork() {
     if (this.network) return this.network
     const imported = await get<{ name: string; network: Network }>('cjf.network').catch(() => undefined)
-    const assumed = parseNetwork(networkJson as never)
+    const assumed = assumedNetwork()
     // A route file without node points keeps the known NOC and hubs.
     const base = !imported ? assumed : { ...imported.network, hubs: imported.network.hubs.length ? imported.network.hubs : assumed.hubs, source: imported.name }
     if (imported) this.source = `Imported: ${imported.name}`
@@ -129,23 +114,7 @@ export class LocalRepo implements Repository {
 
   async getSnapshot() {
     if (this.snap) return this.snap
-    const snap = generateSeed({ asOf: todayManila(), nowMs: Date.now() })
-    // The seed only knows clusters; put crews, updates and incidents on their PO's drawn route.
-    const seg = new Map((await this.getNetwork()).segments.map(s => [s.poId, s]))
-    const workFront = (poId: string) => {
-      const po = snap.pos.find(p => p.id === poId)!
-      const s = seg.get(poId)
-      return s ? pointAlong(s.path, Math.max(0.08, weightedProgress(po.progress, DEFAULT_SETTINGS.weights) / 100)) : undefined
-    }
-    for (const u of snap.updates) u.gps = nudge(workFront(u.poId) ?? u.gps, u.id)
-    for (const c of snap.crews) {
-      const latest = snap.updates.filter(u => u.crewId === c.id).sort((a, b) => b.at.localeCompare(a.at))[0]
-      c.lastCheckIn.gps = latest?.gps ?? nudge(workFront(c.poIds[0]) ?? c.lastCheckIn.gps, c.id)
-    }
-    for (const i of snap.incidents) {
-      const s = i.poId ? seg.get(i.poId) : undefined
-      if (s) i.gps = pointAlong(s.path, 0.55)
-    }
+    const snap = placeOnRoutes(generateSeed({ asOf: todayManila(), nowMs: Date.now() }), await this.getNetwork())
     const log = (await get<Submission[]>(APPLIED_KEY).catch(() => undefined)) ?? []
     return (this.snap = log.reduce(applySubmission, snap))
   }
@@ -161,6 +130,20 @@ export class LocalRepo implements Repository {
   async saveSettings(s: Settings) {
     try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)) } catch { /* not persisted */ }
   }
+
+  // Demo: no token check, the link is the incident id.
+  async getAck(id: string): Promise<AckView | null> {
+    const i = (await this.getSnapshot()).incidents.find(x => x.id === id)
+    return i ? { id: i.id, responsibleParty: i.responsibleParty, receivedAt: i.receivedAt, faultLocation: i.faultLocation, affectedLink: i.affectedLink, description: i.description, bom: i.bom, signed: !!i.undertaking } : null
+  }
+
+  async signAck(id: string, _token: string, u: { name: string; position: string; signature: string }) {
+    const i = (await this.getSnapshot()).incidents.find(x => x.id === id)
+    if (!i || i.undertaking) return false
+    await this.saveIncident({ ...i, undertakingSigned: true, undertaking: { ...u, at: manilaIso(Date.now()), via: 'qr-link' } })
+    return true
+  }
 }
 
-export const repo: Repository = new LocalRepo()
+// Demo mode keeps everything in this browser; otherwise Supabase (loaded only when used).
+export const repo: Repository = DEMO ? new LocalRepo() : new (await import('./supabaseRepo')).SupabaseRepo()

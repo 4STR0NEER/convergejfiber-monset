@@ -2,6 +2,8 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router'
 import { LogOut, Moon, Sun } from 'lucide-react'
 import { canVisit, ROLE_HOME, ROLE_LABEL } from './domain/access'
+import { AUTH_LINK } from './data/supabase'
+import { SetPassword } from './screens/auth/SetPassword'
 import { SignIn } from './screens/auth/SignIn'
 import { useData } from './state'
 import { ErrorBoundary, ScreenLoading } from './ui/ErrorBoundary'
@@ -36,9 +38,11 @@ const TABS: Tab[] = [
 export default function App() {
   const { pathname } = useLocation()
   const { session } = useData()
+  const [needsPassword, setNeedsPassword] = useState(!!AUTH_LINK)
   // The signing page is for an outside party: no account, no internal navigation.
   if (pathname.startsWith('/ack/')) return <main className="h-full overflow-y-auto"><Suspense fallback={<ScreenLoading />}><Routes><Route path="/ack/:id" element={<Ack />} /></Routes></Suspense></main>
   if (!session) return <div className="h-full overflow-y-auto"><SignIn /></div>
+  if (needsPassword) return <div className="h-full overflow-y-auto"><SetPassword name={session.name} onDone={() => setNeedsPassword(false)} /></div>
   // A role that may not open this screen is sent to its own home screen.
   if (!canVisit(session.role, pathname)) return <Navigate to={ROLE_HOME[session.role]} replace />
   return (

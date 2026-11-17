@@ -59,7 +59,10 @@ function split(line: P[], step: number): P[][] {
     }
     cur.push(b); acc += d
   }
-  if (cur.length > 1) acc < step * 0.4 && out.length ? out[out.length - 1].push(...cur.slice(1).map(round)) : out.push(cur.map(round))
+  if (cur.length > 1) {
+    if (acc < step * 0.4 && out.length) out[out.length - 1].push(...cur.slice(1).map(round))
+    else out.push(cur.map(round))
+  }
   return out
 }
 

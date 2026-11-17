@@ -2,3 +2,9 @@ node_modules
 dist
 *.local
 .vite
+.env
+.env.*
+!.env.example
+graphify-out
+supabase/.temp
+supabase/.branches

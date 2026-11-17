@@ -1,7 +1,11 @@
 // App-wide data + shared filters + selection + theme. Screens read everything through useData().
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { repo } from './data/repo'
 import * as auth from './data/auth'
+import { DEMO } from './data/supabase'
+import { generateSeed } from './data/seed'
+import { DEFAULT_SETTINGS } from './domain/config'
+import { todayManila } from './domain/dates'
 import { can as canDo, scopeNetwork, scopeSnapshot, type Action, type Session } from './domain/access'
 import { evaluateAll, type PoEval } from './domain/status'
 import type { Activity, Network, Settings, Snapshot, Status } from './domain/types'
@@ -34,8 +38,8 @@ interface Data {
   can: (a: Action) => boolean
   /** Demo accounts for the sign-in screen. */
   accounts: Session[]
-  signIn: (email: string, password: string) => Session | null
-  signOut: () => void
+  signIn: (email: string, password: string) => Promise<auth.SignInResult>
+  signOut: () => Promise<void>
   /** Reload data and routes from the repository after an office edit (new PO, nodes). */
   refresh: () => Promise<void>
 }
@@ -47,6 +51,10 @@ export const useData = () => {
   return d
 }
 
+/** Demo account list on the sign-in screen: always in demo mode; on a server only for a seeded staging demo. */
+const SHOW_DEMO_ACCOUNTS = DEMO || import.meta.env.VITE_SHOW_DEMO_ACCOUNTS === 'true'
+const EMPTY: Snapshot = { asOf: '', programs: [], clusters: [], categories: [], contractors: [], pos: [], delays: [], crews: [], updates: [], incidents: [] }
+
 const THEME_KEY = 'cjf.theme'
 const readTheme = (): Theme => {
   try { return localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark' } catch { return 'dark' }
@@ -57,12 +65,27 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [filters, setFilters] = useState(NO_FILTERS)
   const [selectedId, select] = useState<string | null>(null)
   const [theme, setThemeState] = useState<Theme>(readTheme)
-  const [session, setSession] = useState<Session | null>(auth.getSession)
+  const [session, setSession] = useState<Session | null>(null)
 
-  useEffect(() => {
-    Promise.all([repo.getSnapshot(), repo.getNetwork(), repo.getSettings()])
-      .then(([snap, network, settings]) => setLoaded({ snap, network, settings }))
+  // With a server, data depends on who is signed in (RLS), so it loads after the session is known.
+  const load = useCallback(async () => {
+    const s = await auth.getSession()
+    const [snap, network, settings] = s || DEMO ? await Promise.all([repo.getSnapshot(), repo.getNetwork(), repo.getSettings()]) : [EMPTY, { segments: [], hubs: [] }, DEFAULT_SETTINGS]
+    setSession(s)
+    setLoaded({ snap, network, settings })
   }, [])
+  useEffect(() => { load() }, [load])
+
+  // Other users' changes (field updates, blockers, incidents, notices) arrive live; refresh at most every 2 s.
+  useEffect(() => {
+    if (!session || !repo.subscribe) return
+    let t: ReturnType<typeof setTimeout> | undefined
+    const off = repo.subscribe(() => { clearTimeout(t); t = setTimeout(async () => {
+      const [snap, network] = await Promise.all([repo.getSnapshot(), repo.getNetwork()])
+      setLoaded(l => (l ? { ...l, snap, network } : l))
+    }, 2000) })
+    return () => { clearTimeout(t); off() }
+  }, [session])
 
   useEffect(() => { document.documentElement.dataset.theme = theme }, [theme])
   // Franchise branding is just three CSS variables.
@@ -85,7 +108,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const snap = session ? scopeSnapshot(loaded.snap, session) : { ...loaded.snap, pos: [], delays: [], updates: [], crews: [], incidents: [] }
     const network = scopeNetwork(loaded.network, snap)
     const evals = evaluateAll(snap, loaded.settings)
-    const accounts = auth.directory(loaded.snap)
+    // Signed out on a server there is no data yet; the seeded demo accounts come from the same deterministic seed.
+    const accounts = !SHOW_DEMO_ACCOUNTS ? [] : auth.directory(DEMO ? loaded.snap : generateSeed({ asOf: todayManila(), nowMs: Date.now() }))
     const reset = () => { setFilters(NO_FILTERS); select(null) }
     const matchesScope = (e: PoEval) =>
       (!filters.program || e.po.programId === filters.program) &&
@@ -97,14 +121,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return {
       ...loaded, snap, network, evals, byId: new Map(evals.map(e => [e.po.id, e])),
       session, accounts, can: (a: Action) => canDo(session, a),
-      signIn: (email: string, password: string) => { const s = auth.signIn(email, password, accounts); if (s) { reset(); setSession(s) } return s },
-      signOut: () => { auth.signOut(); reset(); setSession(null) },
+      signIn: async (email: string, password: string) => {
+        const r = await auth.signIn(email, password, accounts)
+        if ('session' in r) { reset(); if (DEMO) setSession(r.session); else await load() }
+        return r
+      },
+      signOut: async () => { await auth.signOut(); reset(); setSession(null); if (!DEMO) await load() },
       refresh: async () => { const [snap, network] = await Promise.all([repo.getSnapshot(), repo.getNetwork()]); setLoaded(l => (l ? { ...l, snap, network } : l)) },
       filters, setFilters, matchesScope, matches, selectedId, select, theme, setTheme,
       setSnap: (snap: Snapshot) => setLoaded(l => (l ? { ...l, snap } : l)),
       setSettings: (settings: Settings) => { setLoaded(l => (l ? { ...l, settings } : l)); repo.saveSettings(settings) },
     }
-  }, [loaded, filters, selectedId, theme, session])
+  }, [loaded, filters, selectedId, theme, session, load])
 
   if (!value) return <div className="grid h-full place-items-center text-sm text-muted" role="status">Loading the backbone…</div>
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

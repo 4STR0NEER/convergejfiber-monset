@@ -1,28 +1,31 @@
 // Page the responsible party opens from the QR code to sign the Incident Acknowledgment and Undertaking.
-import { useState } from 'react'
-import { useParams } from 'react-router'
-import { repo } from '../../data/repo'
+import { useEffect, useState } from 'react'
+import { useParams, useSearchParams } from 'react-router'
+import { repo, type AckView } from '../../data/repo'
 import { fmtDate, peso } from '../../domain/dates'
 import { useData } from '../../state'
 import { CheckDraw } from '../../ui/CheckDraw'
 import { SignaturePad } from '../../ui/SignaturePad'
 import { SlideToConfirm } from '../../ui/SlideToConfirm'
-import { nowManila } from '../field/proof'
 import { bomTotals } from './Incidents'
 
 export function Ack() {
-  const { id } = useParams()
-  const { snap, setSnap } = useData()
-  const inc = snap.incidents.find(i => i.id === id)
+  const { id = '' } = useParams()
+  const token = useSearchParams()[0].get('t') ?? ''
+  const { session, refresh } = useData()
+  // Works signed out: the server returns only this summary, and only with the link's token.
+  const [inc, setInc] = useState<AckView | null | undefined>()
+  useEffect(() => { repo.getAck(id, token).then(setInc, () => setInc(null)) }, [id, token])
   const [name, setName] = useState('')
   const [position, setPosition] = useState('')
   const [signature, setSignature] = useState<string>()
   const [done, setDone] = useState(false)
+  if (inc === undefined) return <p className="p-8 text-muted" role="status">Loading…</p>
   if (!inc) return <p className="p-8 text-muted">This incident link is not valid.</p>
   const total = bomTotals(inc.bom).total
   const field = 'w-full rounded-xl border border-border bg-bg px-3 py-2.5 text-[15px] outline-none focus:border-[var(--accent)]'
 
-  if (done || inc.undertaking) return (
+  if (done || inc.signed) return (
     <main className="mx-auto flex min-h-full max-w-md flex-col items-center px-5 py-16 text-center" role="status">
       <CheckDraw />
       <h1 className="mt-4 text-xl font-semibold">Acknowledgment received</h1>
@@ -51,7 +54,8 @@ export function Ack() {
         <input aria-label="Position / company" value={position} onChange={e => setPosition(e.target.value)} placeholder="Position and company" className={field} />
         <SignaturePad label="Your signature" value={signature} onChange={setSignature} />
         <SlideToConfirm label="Slide to sign" disabled={!name.trim() || !signature} onConfirm={async () => {
-          setSnap(await repo.saveIncident({ ...inc, undertakingSigned: true, undertaking: { name: name.trim(), position: position.trim(), signature: signature!, at: nowManila(), via: 'qr-link' } }))
+          if (!await repo.signAck(id, token, { name: name.trim(), position: position.trim(), signature: signature! })) { setInc(null); return }
+          if (session) await refresh()
           setDone(true)
         }} />
       </div>

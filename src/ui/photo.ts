@@ -27,8 +27,8 @@ export function photoUrl(id: string, stamp: string) {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
 }
 
-/** Real photos are stored as data URLs; seeded ones are ids for the generated placeholder. */
-export const photoSrc = (id: string, stamp: string) => (id.startsWith('data:') ? id : photoUrl(id, stamp))
+/** Real photos are data URLs (demo, or not yet synced) or signed Storage URLs; seeded ones are ids for the generated placeholder. */
+export const photoSrc = (id: string, stamp: string) => (/^(data:|https?:)/.test(id) ? id : photoUrl(id, stamp))
 
 /** Shrink a camera photo to ~1280px JPEG so the offline outbox stays small. */
 export async function compressPhoto(file: File, max = 1280): Promise<string> {

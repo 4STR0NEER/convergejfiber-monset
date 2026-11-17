@@ -1,7 +1,9 @@
 // Field-side helpers: GPS fix, connectivity, outbox sync, ids.
 import { useCallback, useEffect, useState } from 'react'
 import { repo } from '../../data/repo'
-import { outbox, type OutboxItem } from '../../data/outbox'
+import { getCurrentUserId } from '../../data/auth'
+import { isMine, outbox, type OutboxItem } from '../../data/outbox'
+import { DEMO } from '../../data/supabase'
 import { pointAlong } from '../../domain/geo'
 import type { LngLat, Network, Snapshot } from '../../domain/types'
 
@@ -45,15 +47,16 @@ export function useOutbox() {
 }
 
 let flushing = false
-/** Sends queued items one at a time. The "server" is mocked: a short delay, then repo.submit. */
+/** Sends the signed-in user's queued items one at a time, oldest first. Photos upload with their item. */
 export async function flushOutbox(isOnline: () => boolean, onSnapshot: (s: Snapshot) => void) {
   if (flushing) return
   flushing = true
   try {
-    for (const item of (await outbox.list()).filter(i => i.status === 'queued' || i.status === 'failed')) {
+    // 'sending' here means the app closed mid-send: try it again (the server ignores a repeat).
+    for (const item of (await outbox.list()).filter(i => i.status !== 'sent' && isMine(i, getCurrentUserId()))) {
       if (!isOnline()) break
       await outbox.patch(item.id, { status: 'sending' })
-      await new Promise(r => setTimeout(r, 900))
+      if (DEMO) await new Promise(r => setTimeout(r, 900)) // demo: let the pitch audience see it send
       if (!isOnline()) { await outbox.patch(item.id, { status: 'queued' }); break }
       try {
         onSnapshot(await repo.submit(item.sub))

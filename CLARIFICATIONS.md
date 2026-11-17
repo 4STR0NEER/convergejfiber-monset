@@ -5,7 +5,7 @@ Living file. Updated at the end of every phase. Three parts:
 2. **Decisions made** (answered by Monset, with date).
 3. **Assumptions** we made about process and data, so nothing assumed gets mistaken for confirmed.
 
-Last updated: 2026-11-06 (adding POs and nodes)
+Last updated: 2026-11-17 (Phase 7: real backend, real sign-in)
 
 ---
 
@@ -26,7 +26,7 @@ Last updated: 2026-11-06 (adding POs and nodes)
 | Q11 | Milestone weights | Are weights the same for every category (e.g. UG Verification has almost no civil works)? | One weight set for all (Eng 15, ROW 25, Civil 35, FOC 25), editable globally. |
 | Q12 | Status windows | Are "31+ days" and "within 30 days" calendar days counted from today inclusive? | Exactly 30 days to target = At Risk; 31 = On Track; target day itself = At Risk; day after = Delayed. |
 | Q13 | Data sources | What format do PO lists, PTLs and route maps come in today (Excel, SAP export, KMZ)? | Not yet known; repository interface ready for an import. |
-| Q14 | Users | Who logs in: Backbone PMs, PMO, contractors, crew leads? Does each MSP see only its own POs? | Single demo user sees everything. |
+| Q14 | Users | Who logs in: Backbone PMs, PMO, contractors, crew leads? Does each MSP see only its own POs? | Three roles (Admin, Contractor manager, Ground team); each MSP sees only its own POs, enforced by row-level security from Phase 7. |
 | Q15 | Branding | Final logo and exact brand hex codes for Converge-J Fiber? | Orange / violet / violet-black palette with ember, magenta, plum in between. Placeholder "J fiber strand" mark. |
 | Q16 | Route files | In the client's KMZ/KML, where is the PO/WO number stored (Placemark name, ExtendedData field, folder name)? | Import stub reads ExtendedData `PO` / `PO_NO` / `WO`, else a 10-digit or WO-number pattern in the name. |
 | Q17 | Segments | Can one PO cover several disconnected route pieces, or can one route piece be shared by two POs? | Each drawn segment belongs to exactly one PO, one segment per PO in the seed. Multiple segments per PO already supported. |
@@ -42,20 +42,25 @@ Last updated: 2026-11-06 (adding POs and nodes)
 | Q27 | Undertaking text | Exact legal wording of the Incident Acknowledgment and Undertaking, and is an e-signature on a phone acceptable? | Placeholder wording, clearly marked. Finger signature on the crew's phone or on the party's own phone via QR. |
 | Q28 | BOM rates | Is there a standard rate card for restoration items, and who prepares/approves the BOM (MSP, PM, PMO)? | Office fills the BOM from a preset list with editable unit costs. |
 | Q29 | Blockers | Who closes a blocker: the crew, or the Backbone PM? Can a blocker be back-dated? | Crew taps "Cleared today". Start date can be back-dated, not future-dated. |
-| Q30 | Close roles | Who performs each close step in the system (MSP, build team, PMO, Backbone PM, Backbone Build), and does any step need a second person to approve? | One demo user can mark any step done; who and when is recorded. |
+| Q30 | Close roles | Who performs each close step in the system (MSP, build team, PMO, Backbone PM, Backbone Build), and does any step need a second person to approve? | Only roles with `can_run_close` (Admin) mark steps done; who and when is recorded, and every change is in the audit log. No second approver. |
 | Q31 | Waivers | Who may waive LD on a fallout PO, and does a waiver need PMO approval? | A PM can waive with a written reason; it shows struck through on the recommendation. |
 | Q32 | Notices | How are LD notices delivered today (email, printed letter, portal)? Should contractors acknowledge inside the system? | Printable notice per contractor; PMO records who acknowledged and when, or a dispute reason. |
 | Q33 | Claim amount date | Is the LD on a notice computed as of month end, or as of the date the notice is issued? | As of month end (open POs keep accruing and appear again next month). |
 | Q34 | Finance | Is claimed LD deducted from the contractor's next payment? Should the system hand off to finance/SAP? | Out of scope; the notice is the hand-off. |
-| Q35 | Settings access | Who may change LD rate, cap, reason codes and weights? Is an audit trail needed? | Any user can change them; changes apply to every screen at once. No audit trail yet. |
+| Q35 | Settings access | Who may change LD rate, cap, reason codes and weights? Is an audit trail needed? | Only roles with `can_edit_settings` (Admin). Every change is in the audit log (who, when, before, after) from Phase 7. |
 | Q36 | Route import | Can the client share one sample KMZ early, so we can confirm where PO numbers sit and how mainline vs distribution lines are marked? | Import accepts KMZ/KML/GeoJSON and matches by ExtendedData PO / PO_NO / WO or the Placemark name; "main", "backbone" or "ring" in the name = mainline. |
-| Q37 | Converge roles | Should Converge-J Fiber staff be split further, e.g. Backbone PMs (follow-up, gap analyses) vs PMO (fallout list, notices) vs leadership (read-only) vs system admin (settings)? | One Admin role for all Converge-J Fiber staff. |
+| Q37 | Converge roles | Should Converge-J Fiber staff be split further, e.g. Backbone PMs (follow-up, gap analyses) vs PMO (fallout list, notices) vs leadership (read-only) vs system admin (settings)? | One Admin role for all Converge-J Fiber staff. Roles are now data (permission flags per role), so the split is new rows, not new code. |
 | Q38 | Contractor visibility | May contractor managers see their LD exposure live, before a notice is issued? May they see anonymised benchmarks against other MSPs? | They see their own live LD and scorecard; nothing about other contractors. |
-| Q39 | Ground accounts | Does every lineman get an account, or only crew leads? Can one phone be shared by a crew? | One account per crew lead. A shared phone keeps its unsent outbox across sign-ins. |
-| Q40 | Accounts | Who creates and removes accounts (contractor staff change often)? Should Converge staff sign in with Google Workspace or Microsoft? | Demo accounts only. Live: admin invites users; SSO for Converge staff, email + password for contractors. |
+| Q39 | Ground accounts | Does every lineman get an account, or only crew leads? Can one phone be shared by a crew? | One account per crew lead. A shared phone keeps its unsent outbox across sign-ins; each item is sent only when the person who queued it is signed in (the server records who sent it). |
+| Q40 | Accounts | Who creates and removes accounts (contractor staff change often)? Should Converge staff sign in with Google Workspace or Microsoft? | Built: admin invites by email (Settings > People and access), no public sign-up, email + password. Google / Microsoft sign-in is wired but switched off until you confirm which one. Removing access: change the role or delete the user in Supabase. |
 | Q41 | PO entry | Should new POs be typed in by PMO, or flow in from SAP / the PO system? Who is allowed to create them? | Admins add them by hand (PO number, program, cluster, category, contractor, cost, PTL, route, crew). A SAP import can replace this. |
 | Q42 | Changing POs | Who may change a PO after it is created (cost variation, new PTL, contractor change, cancellation)? | Not built yet. A PTL change should create a new PTL version, never overwrite the signed one. |
 | Q43 | Node types | Beyond the core node / NOC and hubs, which network points matter on the map (OLTs, ODFs, splice closures, handholes)? | Two types: core node / NOC and hub. |
+| Q44 | Hosting | Who should own the Supabase account and pay for it (Converge-J Fiber IT, or Monset on Converge's behalf)? Is a Singapore-region database acceptable under your data privacy rules? | Monset sets it up in Singapore (closest region); ownership can be transferred. |
+| Q45 | Invitation emails | Which address should invitation and password emails come from (e.g. no-reply@convergej...)? Supabase's built-in sender is rate-limited and not for production. | Supabase's default sender during testing; we need your mail server (SMTP) details before go-live. |
+| Q46 | Sign-in security | Do you require a minimum password policy, two-factor sign-in for admins, or automatic sign-out after inactivity? | Passwords of at least 10 characters; no two-factor yet; sessions stay signed in on the device. |
+| Q47 | Audit log | Who may read the audit log besides admins (e.g. internal audit), and how long must it be kept? | Admins only; kept indefinitely. |
+| Q48 | Field photos | How long must field photos be kept, and is there a size or count limit per update? | Kept indefinitely, about 1280 px JPEG each, no count limit. Stored privately; only people who can see the PO can open them. |
 
 ## 2. Decisions made
 
@@ -74,6 +79,10 @@ Last updated: 2026-11-06 (adding POs and nodes)
 | 2026-11-06 | **Three roles**: Admin (Converge-J Fiber), Contractor manager (one MSP), Ground team (Field App, own crew). |
 | 2026-11-06 | **Admins can add POs and network nodes** in the app (no file needed). |
 | 2026-11-06 | On phones the Command Center opens as a **list, not the map**: people on the go should not have to pinch and pan. The map is one tap away. |
+| 2026-11-17 | **Supabase** is the backend (Postgres + PostGIS, Auth, Storage, Realtime). The browser-only version stays as **demo mode** behind one setting, so the pitch runs without a backend. |
+| 2026-11-17 | **Roles are data**: a roles table with one permission flag per action, so Admin can be split later (Q37) without a rewrite. |
+| 2026-11-17 | An **audit log** records every change to business data and settings (who, when, what, before, after, reason) from day one. |
+| 2026-11-17 | **Signed PTL versions can never be changed or deleted** in the database, not even by an admin; a new PTL is always a new version. |
 
 ## 3. Assumptions
 
@@ -184,7 +193,7 @@ All data is invented. Nothing comes from Converge or any real contractor.
 - Managers **cannot**: open Settings, run or mark close steps, edit gap analyses, waive, issue notices, decide whether permanent restoration is awarded, or open the internal LD recommendation memo.
 - A screen a role may not open sends the user to their home screen. A deep link opened while signed out returns to that page after sign-in if the role allows it.
 - The QR signing page for responsible parties needs no account.
-- The Field App's offline outbox belongs to the phone, not the user: items waiting to send survive sign-out and go out after the next sign-in (so nothing typed in the field is lost).
+- The Field App's offline outbox belongs to the phone, not the user: items waiting to send survive sign-out, so nothing typed in the field is lost. From Phase 7 each item goes out when the person who queued it signs in again (see Q39).
 
 ### Adding POs and nodes (2026-11-06)
 
@@ -195,3 +204,21 @@ All data is invented. Nothing comes from Converge or any real contractor.
 - **Assigning a crew** puts the PO in that crew's Field App straight away.
 - Drawn routes and node changes are kept **as edits on top of the loaded route file**, so importing the real routes later does not lose them. Map labels use each node's own name.
 - Editing or cancelling an existing PO is not built yet (Q42).
+
+### Real backend and sign-in (Phase 7, 2026-11-17)
+
+- **Two modes.** Demo mode (no backend, everything in the browser, the pitch) runs whenever Supabase is not configured or `VITE_DEMO_MODE=true`. Live mode uses Supabase. The seeded demo portfolio and demo accounts can be loaded into Supabase with one command for a shared staging demo; re-running it refreshes the dates and wipes all data.
+- **Who sees what is enforced on the server** (row-level security), with the same rules as before: Admin sees everything; a contractor manager sees only their contractor's POs, crews, routes, field updates, blockers, incidents (plus incidents their MSP witnessed) and LD notices once issued; a crew lead sees only their crew and its POs.
+- **Contractor managers may send field updates as one of their own crews**, as in the prototype (`field.switchCrew`); never as another contractor's crew.
+- **Network nodes (NOC, hubs) are visible to every signed-in user**; routes only with their PO.
+- **Programs, clusters, categories, reason codes, holidays and settings** are readable by every signed-in user, changeable only with `can_edit_settings`.
+- A reason code removed in Settings becomes **inactive**: crews can no longer pick it, but old blockers keep it.
+- **Field photos and signatures** are stored privately, in a folder per PO; a person can open a photo only if they can see its PO. Photos are shown through links that expire after an hour (they renew whenever the data refreshes).
+- **QR signing link**: now carries a secret token. Anyone holding the link can see the incident summary and sign once; nothing else. Because the signer has no account, their signature image is kept with the incident record rather than in file storage.
+- **A field update sent twice** (for example, the phone lost the reply and retried) is recorded once.
+- **Timestamps** are stored with time zone and shown in Manila time.
+- **Contractor managers cannot change the restoration award** on an incident even though they can edit its bill of materials; the database refuses it.
+- **LD notices**: only the PMO (`can_issue_notices`) issues them; a contractor can acknowledge or dispute only their own, and only after it is issued.
+- **Live updates**: when someone else sends a field update, blocker, incident or notice acknowledgment, other signed-in users see it within a few seconds without reloading.
+- **Linting** uses oxlint: ESLint's TypeScript support cannot load TypeScript 7, which this project uses.
+- Not yet tested on a real phone against a live Supabase project (needs the project credentials).

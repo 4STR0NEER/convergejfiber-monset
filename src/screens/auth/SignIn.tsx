@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { HardHat, KeyRound, ShieldCheck, Users } from 'lucide-react'
-import { DEMO_PASSWORD } from '../../data/auth'
+import { DEMO_PASSWORD, signInWithProvider } from '../../data/auth'
+import { DEMO, SSO_PROVIDERS } from '../../data/supabase'
 import { canVisit, ROLE_HOME, ROLE_LABEL, type Role, type Session } from '../../domain/access'
 import { useData } from '../../state'
 
@@ -15,12 +16,15 @@ export function SignIn() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [crew, setCrew] = useState('')
+  const [busy, setBusy] = useState(false)
 
-  const go = (e: string, p: string) => {
-    const s = signIn(e, p)
-    if (!s) { setError('That email and password do not match a demo account.'); return }
+  const go = async (e: string, p: string) => {
+    setBusy(true)
+    const r = await signIn(e, p)
+    setBusy(false)
+    if ('error' in r) { setError(r.error); return }
     // Back to where they were heading if their role allows it, else their home screen.
-    navigate(canVisit(s.role, pathname) ? pathname : ROLE_HOME[s.role], { replace: true })
+    navigate(canVisit(r.session.role, pathname) ? pathname : ROLE_HOME[r.session.role], { replace: true })
   }
   const byRole = (r: Role) => accounts.filter(a => a.role === r)
   const quick = (a: Session) => go(a.email, DEMO_PASSWORD)
@@ -36,7 +40,7 @@ export function SignIn() {
           <div className="leading-tight"><p className="text-lg font-semibold tracking-tight">Converge-J Fiber</p><p className="text-sm text-muted">Backbone Command</p></div>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-[1fr_1.15fr]">
+        <div className={`grid gap-6 ${accounts.length ? 'md:grid-cols-[1fr_1.15fr]' : 'mx-auto max-w-md'}`}>
           <form className="rounded-2xl border border-border bg-surface p-6" onSubmit={e => { e.preventDefault(); go(email, password) }}>
             <h1 className="text-xl font-semibold tracking-tight">Sign in</h1>
             <label className="mt-5 block text-[13px] font-medium">Email
@@ -46,11 +50,20 @@ export function SignIn() {
               <input type="password" autoComplete="current-password" value={password} onChange={e => { setPassword(e.target.value); setError('') }} className={`${input} mt-1.5`} required />
             </label>
             {error && <p role="alert" className="mt-3 text-[13px] text-bad">{error}</p>}
-            <button className="mt-5 h-11 w-full rounded-xl bg-text text-[15px] font-semibold text-bg">Sign in</button>
-            <p className="mt-4 flex gap-2 text-xs text-muted"><KeyRound size={14} className="mt-0.5 shrink-0" /><span>Prototype sign-in with demo accounts (password <span className="font-mono text-text">{DEMO_PASSWORD}</span>). The live system uses company accounts.</span></p>
+            <button disabled={busy} className="mt-5 h-11 w-full rounded-xl bg-text text-[15px] font-semibold text-bg disabled:opacity-60">{busy ? 'Signing in…' : 'Sign in'}</button>
+            {SSO_PROVIDERS.map(p => (
+              <button key={p} type="button" onClick={() => signInWithProvider(p)} className="mt-2.5 h-11 w-full rounded-xl border border-border text-[14px] font-medium hover:bg-surface-2">
+                Converge staff: sign in with {p === 'google' ? 'Google' : 'Microsoft'}
+              </button>
+            ))}
+            <p className="mt-4 flex gap-2 text-xs text-muted"><KeyRound size={14} className="mt-0.5 shrink-0" />
+              {DEMO
+                ? <span>Demo mode: demo accounts only (password <span className="font-mono text-text">{DEMO_PASSWORD}</span>), data stays in this browser.</span>
+                : <span>Accounts are by invitation from the Converge-J Fiber admin. Forgot your password? Ask the admin to send a new invitation.</span>}
+            </p>
           </form>
 
-          <section className="rounded-2xl border border-border bg-surface p-6" aria-labelledby="demo-h">
+          {accounts.length > 0 && <section className="rounded-2xl border border-border bg-surface p-6" aria-labelledby="demo-h">
             <h2 id="demo-h" className="text-[15px] font-semibold">Demo accounts</h2>
             <p className="mt-0.5 text-[13px] text-muted">Each role sees a different slice of the same data.</p>
 
@@ -71,7 +84,7 @@ export function SignIn() {
                 <button type="button" disabled={!crew} onClick={() => go(crew, DEMO_PASSWORD)} className="h-9 rounded-lg bg-text px-3 text-[13px] font-medium text-bg disabled:opacity-40">Sign in as crew</button>
               </div>
             </RoleBlock>
-          </section>
+          </section>}
         </div>
       </div>
     </main>

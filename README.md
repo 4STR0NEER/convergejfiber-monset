@@ -2,7 +2,7 @@
 
 A working prototype of a backbone fiber project tracker for **Converge-J Fiber** (Converge ICT franchise, Metro Cebu), built by **Monset**. It tracks every PO/WO against its signed Project Timeline (PTL), predicts slippage before the due date, computes liquidated damages (LD) live, runs the month-end LD close, and gives crews an offline field app.
 
-**All data is assumed.** POs, contractors, crews, routes and costs are generated. Real data replaces it later without touching the UI (see below). Every open question and assumption is logged in [`CLARIFICATIONS.md`](CLARIFICATIONS.md).
+**All data is assumed.** POs, contractors, crews, routes and costs are generated. It runs in two modes: **demo mode** (everything in the browser, no backend, for the pitch) and **live mode** on Supabase (shared data, real accounts, row-level security). See [Backend (Supabase)](#backend-supabase). Every open question and assumption is logged in [`CLARIFICATIONS.md`](CLARIFICATIONS.md).
 
 ---
 
@@ -13,12 +13,14 @@ Requires Node 22+.
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # Vitest: domain rules, LD math, seed, field submissions
+npm test           # Vitest: domain rules, LD math, seed, field submissions, database RLS
+npm run typecheck  # TypeScript only
+npm run lint       # oxlint (ESLint cannot load TypeScript 7)
 npm run build      # type-check + production build (+ service worker)
 npm run preview    # serve the production build
 ```
 
-The seed is deterministic (fixed random seed) and its dates are relative to today, so the portfolio looks the same whichever day you demo it.
+With no `.env` the app runs in **demo mode**. The seed is deterministic (fixed random seed) and its dates are relative to today, so the portfolio looks the same whichever day you demo it.
 
 ## Screens
 
@@ -52,7 +54,12 @@ All rules live in `src/domain/` as plain TypeScript with no React or I/O, and ar
 src/
   domain/      business rules + tests (framework free)
   data/
-    repo.ts          Repository interface + LocalRepo (seed + IndexedDB)
+    repo.ts          Repository interface + LocalRepo (demo: seed + IndexedDB); picks the backend
+    supabaseRepo.ts  Repository on Supabase (live mode)
+    rows.ts          domain objects <-> database rows (shared by repo, seed script, tests)
+    network.ts       route helpers shared by both repos and the seed script
+    auth.ts          sign-in: demo accounts or Supabase Auth
+    supabase.ts      the mode flag (VITE_DEMO_MODE / Supabase env)
     seed.ts          deterministic assumed data
     network.geo.json ALL route geometry (assumed), one feature per segment
     importRoutes.ts  KMZ / KML / GeoJSON -> Network
@@ -62,6 +69,12 @@ src/
   state.tsx    loads data once, shared filters, selection, theme, settings
   theme.css    design tokens (light + dark), brand variables, print styles
 scripts/build-network.ts   regenerates the assumed network.geo.json
+scripts/seed-supabase.ts   loads the demo portfolio and demo accounts into Supabase
+supabase/
+  migrations/              schema, roles, RLS, audit log, storage buckets
+  functions/invite-user/   Edge Function: admin invites a user
+  rls.test.ts              runs the migrations in PGlite and proves each role's access
+docs/user-guide.md         how to use the screens (new screens from Phase 7 on)
 ```
 
 ## Adding POs and nodes by hand
@@ -87,78 +100,61 @@ Matching rule (until we see the client's files, see Q16 in `CLARIFICATIONS.md`):
 
 A KMZ converts with GDAL: `ogr2ogr -f GeoJSON routes.geojson routes.kmz`, then add the properties above. With a backend, routes come from PostGIS instead (next section).
 
-## Swapping in a real backend (Supabase + PostGIS)
+## Backend (Supabase)
 
-The UI only talks to the `Repository` interface in `src/data/repo.ts`:
+The UI only talks to the `Repository` interface in `src/data/repo.ts`. `LocalRepo` is demo mode; `SupabaseRepo` is live mode. One flag in `src/data/supabase.ts` decides which runs: live mode when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are set, unless `VITE_DEMO_MODE=true`. The demo build never downloads supabase-js.
 
-```ts
-getSnapshot(), getNetwork(), getSettings(), saveSettings(),
-submit(submission), saveIncident(incident), getClose(period), saveClose(close),
-saveNetwork(network | null), getNetworkSource(), createPo(po, { crewId, segment }), saveHub(hub), removeHub(id)
-```
+### Set up a project
 
-1. Write `SupabaseRepo implements Repository` and change the one line `export const repo: Repository = new LocalRepo()`. No screen changes.
-2. `getSnapshot()` returns the same `Snapshot` shape (`src/domain/types.ts`) built from tables; the business rules keep running client-side on it.
-3. `submit()` becomes an insert (field update, blocker, incident). Photos move from data URLs to Supabase Storage; store the object path in `photoIds`.
-4. The crew outbox (`src/data/outbox.ts`) already queues and retries; only `flushOutbox` changes from the mock delay to the real call.
-5. The QR signing page (`/ack/:id`) should take a short-lived signed token (Edge Function) so a third party can sign without an account.
+1. Create a Supabase project (region: Singapore is closest to Cebu).
+2. In **Authentication > Sign In / Providers**, turn **off** "Allow new users to sign up". Accounts come only from admin invitations.
+3. Apply the schema with the CLI (`npx supabase init` once, it keeps `supabase/migrations`; then `npx supabase link --project-ref <ref>`, `npx supabase db push`, `npx supabase functions deploy invite-user`), or paste the files in `supabase/migrations/` into the SQL editor in name order (the Edge Function still needs the CLI).
+4. `cp .env.example .env` and fill in `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (Project Settings > API). `.env` is git-ignored; the service role key must never go in a `VITE_` variable.
+5. `npm run seed:supabase` loads the demo portfolio (dates relative to today) and the demo accounts (password `demo1234`). Re-run it to refresh the dates; it wipes all business data first.
+6. `npm run dev`. For a seeded staging demo, `VITE_SHOW_DEMO_ACCOUNTS=true` lists the demo accounts on the sign-in screen. Never set it in production.
 
-Schema sketch:
+### What is in the database
 
-```sql
-create extension if not exists postgis;
-create table contractors (id text primary key, name text not null);
-create table programs   (id text primary key, name text, type text, unit text check (unit in ('PO','WO')));
-create table clusters   (id text primary key, name text, center geography(point));
-create table categories (id text primary key, name text, scope text);
-create table pos (
-  id text primary key, kind text, title text,
-  program_id text references programs, cluster_id text references clusters,
-  category_id text references categories, contractor_id text references contractors,
-  cost_of_works numeric(14,2) not null, length_km numeric,
-  progress jsonb not null default '{"ENG":0,"ROW":0,"CIVIL":0,"FOC":0}',
-  milestone_actual jsonb default '{}', pat_date date, docs_submitted_at timestamptz
-);
-create table ptl_versions (po_id text references pos, version int, signed_at date, start date,
-  target_pat date, milestones jsonb, note text, primary key (po_id, version));
-create table delay_reasons (code text primary key, label text, description text, ld_eligible boolean);
-create table delay_events (id text primary key, po_id text references pos, reason_code text references delay_reasons,
-  milestone text, start date not null, "end" date, note text, reported_by text);
-create table crews (id text primary key, lead text, contractor_id text references contractors);
-create table field_updates (id text primary key, po_id text references pos, crew_id text references crews,
-  milestone text, progress int check (progress between 0 and 100), photo_paths text[] not null,
-  gps geography(point) not null, gps_source text, at timestamptz not null, note text);
-create table segments (id text primary key, po_id text references pos, tier text, corridor text,
-  path geography(linestring) not null);
-create table hubs (id text primary key, name text, core boolean, location geography(point));
-create table incidents (id text primary key, po_id text references pos, report jsonb not null,
-  bom jsonb not null default '[]', permanent_restoration text, undertaking jsonb);
-create table month_closes (period text primary key, state jsonb not null);
-create table settings (id int primary key default 1, value jsonb not null);
-```
+`supabase/migrations/20261117000001_core.sql`:
 
-Row-level security to plan for: MSP users see only their contractor's POs; crews insert updates only for POs they are assigned; PMO/Backbone roles see everything and run the close; settings editable by admins only (see Q14, Q30, Q35).
+- **Reference data and settings:** `contractors`, `programs`, `categories`, `clusters`, `reason_codes` (removed ones become inactive, old blockers keep their code), `holidays`, `settings` (LD rate, cap, weights, thresholds, brand, network source).
+- **Work:** `pos`, `ptl_versions` (a trigger refuses any update or delete: a PTL change is always a new version), `po_milestones` (progress and actual dates), `crews`, `crew_pos`.
+- **Field:** `field_updates` (insert only; a trigger moves the milestone and the crew's last check-in, the same rule as `applySubmission`), `delay_events`, `incidents` (with a secret `ack_token` for the QR signing link).
+- **Routes (PostGIS):** `segments` (`geography(linestring)`, read through the `segments_api` view as GeoJSON coordinates), `network_nodes`; points are `geography(point)` columns generated from lng/lat.
+- **Month-end close:** `month_closes`, `close_gaps`, `close_waivers`, `ld_notices`, split per PO / contractor so RLS can show a contractor only their own rows.
+- **People:** `roles` (roles as data, see Sign-in and roles), `profiles` (user, role, contractor, crew).
+- **`audit_log`:** a trigger on every business table writes who, when, entity, field, before, after and reason (settings changes included). Readable by roles with `can_read_audit`; nobody can write to it directly.
+- **Server functions** (one transaction each, the caller's RLS applies): `create_po`, `save_settings`, `replace_network`; `ack_incident` and `sign_undertaking` for the QR page (anyone holding the link's token); `reset_demo_data` (service role only, used by the seed script).
+
+`20261117000002_storage.sql`: private buckets `field-photos`, `signatures`, `moa-scans`. Object names start with the PO id (`<poId>/<file>`), so who can see a photo follows who can see the PO. The app shows them through one-hour signed URLs.
+
+The database time zone is `Asia/Manila`, so timestamps come back as `+08:00`: the business rules compare timestamp strings.
+
+### Realtime
+
+Field updates, blockers, incidents, crews, POs and LD notices are in the `supabase_realtime` publication. A signed-in app refreshes its data at most every 2 seconds after a change it is allowed to see.
+
+### Proving the security rules
+
+`supabase/rls.test.ts` (part of `npm test`) starts an in-process Postgres with PostGIS ([PGlite](https://pglite.dev)), stands in for Supabase's `auth` and `storage` schemas, runs the real migrations, loads the seed, then signs in as admin, two contractor managers and a crew lead. It checks that each sees exactly what `scopeSnapshot()` gives them, that a contractor cannot read another contractor's rows, that crews can only report on their own POs, that signed PTLs cannot change, that notices stay hidden until issued, that the audit log records changes, that photos in Storage follow PO visibility, and that the whole seed reads back unchanged through the row mapping.
 
 ## Sign-in and roles
 
-The prototype signs in with **demo accounts** (password `demo1234`), listed on the sign-in screen. It is simulated in the browser, so it shows how roles behave but is **not security**; the live system uses Supabase Auth.
+**Demo mode** signs in with demo accounts (password `demo1234`) listed on the sign-in screen, checked in the browser: it shows how roles behave but is not security. **Live mode** uses Supabase Auth with email and password. Google and Microsoft sign-in for Converge staff is wired but off (`VITE_SSO_PROVIDERS`, Q40); turning it on also needs the provider set up in Supabase. There is no public sign-up: the admin invites people from **Settings > People and access** (Edge Function `invite-user`), and the invitation link signs them in and asks them to choose a password.
 
 | Role | Who | Sees | Can do |
 |---|---|---|---|
-| Admin | Converge-J Fiber Backbone Build / PMO (`admin@convergej.demo`) | Everything | Everything: add POs and network nodes, settings and route files, run the month-end close, waive, issue notices, decide incident awards |
-| Contractor manager | One per MSP (`pm.mcc@convergej.demo`, ...) | Only their contractor's POs, routes, crews, incidents, scorecard and LD | Edit the BOM on their incidents, acknowledge or dispute their LD notice, view their crews in the Field App. No Settings; the LD recommendation memo is internal. |
+| Admin | Converge-J Fiber Backbone Build / PMO (`admin@convergej.demo`) | Everything | Everything: add POs and network nodes, settings and route files, run the month-end close, waive, issue notices, decide incident awards, invite users, read the audit log |
+| Contractor manager | One per MSP (`pm.mcc@convergej.demo`, ...) | Only their contractor's POs, routes, crews, incidents, scorecard and LD; LD notices once issued | Edit the BOM on their incidents, acknowledge or dispute their LD notice, send field updates as one of their crews. No Settings; the LD recommendation memo is internal. |
 | Ground team | Linemen / crew leads (`jun.cabahug@convergej.demo`, ...) | Field App only, their own crew | Progress updates, blockers, damage reports |
 
-The rules live in `src/domain/access.ts` (tested): `can(session, action)`, `canVisit(role, path)` and `scopeSnapshot()`, which trims the data to what the user may see before any screen gets it. `src/data/auth.ts` holds the demo sign-in. With Supabase:
+**Roles are data.** The `roles` table has one row per role, a `scope` (`all`, `contractor`, `crew`) and one boolean per permission: `can_edit_settings`, `can_run_close`, `can_issue_notices`, `can_acknowledge_notices`, `can_edit_bom`, `can_award_incidents`, `can_submit_field`, `can_switch_crew`, `can_create_pos`, `can_edit_network`, `can_manage_users`, `can_read_audit`, `can_approve_change_requests`. Splitting Admin into PMO, Backbone PM, leadership and system admin (Q37) means adding rows, not code. The app reads the signed-in user's flags; `DEFAULT_ROLES` in `src/domain/access.ts` mirrors the seeded rows for demo mode, and a test keeps them equal.
 
-- `signIn` / `signOut` / `getSession` become Supabase Auth calls (email + password, or Google / Microsoft SSO for Converge staff).
-- A `profiles` table stores `role`, `contractor_id` and `crew_id` per user.
-- `scopeSnapshot` becomes row-level security, e.g. `pos`: `using (auth_role() = 'admin' or contractor_id = auth_contractor())`; `field_updates`: insert only where the PO is assigned to the user's crew; `settings`: write only for admin.
-- The QR signing page stays public but takes a short-lived signed token.
+The rules exist twice on purpose: `src/domain/access.ts` (`can`, `canVisit`, `scopeSnapshot`) shapes the UI, and the RLS policies enforce them on the server. The RLS test compares the two.
 
 ## Offline and PWA
 
-`vite-plugin-pwa` precaches the app shell, so `/field` opens with no signal once visited (verified with the network cut). Submissions go to an IndexedDB outbox and are sent in order when online; the app has a **Simulate no signal** switch for demos. Map tiles are not cached; the crew app does not need the map.
+`vite-plugin-pwa` precaches the app shell, so `/field` opens with no signal once visited (verified with the network cut). Submissions go to an IndexedDB outbox and are sent in order when online; the app has a **Simulate no signal** switch for demos. In live mode, sending uploads the photos to Storage with the record; a retry after a lost reply is ignored by the server, never applied twice. Each queued item remembers who queued it: unsent items survive sign-out and are sent the next time that same person signs in on the phone (Q39, shared phones). Map tiles are not cached; the crew app does not need the map.
 
 ## Accessibility and motion
 
