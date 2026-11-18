@@ -15,6 +15,7 @@ import { fmtDate } from '../../domain/dates'
 import { useData } from '../../state'
 import { ago, pesoShort } from '../../ui/format'
 import { glyphSvg, hexToRgb, STATUS_DASH, STATUS_HEX } from '../../ui/status'
+import { markSlowGpu } from '../../ui/gpu'
 
 const BUILDING = { dark: '#231d36', light: '#d8d1de' }
 const NOC: LngLat = [123.9223, 10.3236]
@@ -61,6 +62,11 @@ export function HeroMap({ mode3d, reduceMotion, resetSignal, lowPower }: Props) 
   const [reveal, setReveal] = useState(skipIntro ? 1 : 0)
   const [time, setTime] = useState(0)
   const [glError, setGlError] = useState(false)
+  // Light mode for weak GPUs (detected up front, or measured below): no pulse, no orbit, no 3D buildings, 1x pixels.
+  // The map then only redraws when someone moves it.
+  const [slow, setSlow] = useState(false)
+  const light = lowPower || slow
+  const animated = !reduceMotion && mode3d && !light
   const lastInteraction = useRef(0)
   const orbiting = useRef(false)
   const mapRef = useRef<MapRef>(null)
@@ -107,20 +113,31 @@ export function HeroMap({ mode3d, reduceMotion, resetSignal, lowPower }: Props) 
 
   // ---------- frame loop: pulse + idle orbit (orbit only on capable GPUs) ----------
   useEffect(() => {
-    if (reduceMotion || !mode3d) { orbiting.current = false; return }
+    if (!animated) { orbiting.current = false; return }
     let raf = 0, last = performance.now()
+    // Frame-rate check: browser frames counted between 1 s and 4 s in (the busiest stretch: intro, tiles loading).
+    // ponytail: one fixed threshold, tune MIN_FPS if capable laptops get flagged
+    const start = last, MIN_FPS = 40
+    let frames = 0, measured = false
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame)
+      if (!measured && now - start > 1000) {
+        frames++
+        if (now - start > 4000) {
+          measured = true
+          if (frames / ((now - start - 1000) / 1000) < MIN_FPS && document.visibilityState === 'visible') { markSlowGpu(); setSlow(true); return }
+        }
+      }
       if (now - last < FRAME_MS) return
       const dt = Math.min(0.1, (now - last) / 1000); last = now
       setTime(t => (t + dt * 0.6) % PULSE_LOOP)
-      if (lowPower || selectedId) return
+      if (selectedId) return
       if (!orbiting.current && lastInteraction.current && now - lastInteraction.current > RESUME_ORBIT_MS) orbiting.current = true
       if (orbiting.current) setView(v => ({ ...v, bearing: (v.bearing ?? 0) + dt * ORBIT_DEG_PER_S, transitionDuration: 0 }))
     }
     raf = requestAnimationFrame(frame)
     return () => cancelAnimationFrame(raf)
-  }, [reduceMotion, mode3d, selectedId, lowPower])
+  }, [animated, selectedId])
 
   // ---------- fly to the selected segment ----------
   useEffect(() => {
@@ -162,11 +179,11 @@ export function HeroMap({ mode3d, reduceMotion, resetSignal, lowPower }: Props) 
         },
       })
     }
-    map.setLayoutProperty('cjf-buildings', 'visibility', mode3d ? 'visible' : 'none')
+    map.setLayoutProperty('cjf-buildings', 'visibility', mode3d && !light ? 'visible' : 'none')
     for (const l of map.getStyle().layers ?? []) {
       if (l.type === 'symbol' && !l.id.startsWith('cjf')) map.setPaintProperty(l.id, 'text-opacity', 0.45)
     }
-  }, [theme, mode3d])
+  }, [theme, mode3d, light])
   useEffect(() => { addBuildings() }, [addBuildings])
 
   // ---------- layers ----------
@@ -199,7 +216,7 @@ export function HeroMap({ mode3d, reduceMotion, resetSignal, lowPower }: Props) 
           getDashArray: s => STATUS_DASH[byId.get(s.poId)!.status] ?? [0, 0], dashJustified: true,
           extensions: [new PathStyleExtension({ dash: true })], updateTriggers,
         }),
-        !reduceMotion && mode3d && new TripsLayer<Seg>({
+        animated && new TripsLayer<Seg>({
           id: 'pulse', data: active, getPath: s => s.path, getTimestamps: s => s.pulseTs,
           getColor: theme === 'dark' ? [255, 214, 186] : [194, 71, 10], getWidth: s => (s.tier === 'mainline' ? 4 : 2.4),
           widthUnits: 'pixels', capRounded: true, currentTime: time, trailLength: 0.8, fadeTrail: true,
@@ -210,11 +227,11 @@ export function HeroMap({ mode3d, reduceMotion, resetSignal, lowPower }: Props) 
   layers.push(
     // Ground pulse under the NOC pin: two rings expanding out of phase (one static ring when motion is off).
     new ScatterplotLayer<{ coord: LngLat; phase: number }>({
-      id: 'noc-pulse', data: hubs.filter(h => h.core).flatMap(h => (reduceMotion || !mode3d ? [0.5] : [0, 0.5]).map(o => ({ coord: h.coord, phase: o }))),
+      id: 'noc-pulse', data: hubs.filter(h => h.core).flatMap(h => (animated ? [0, 0.5] : [0.5]).map(o => ({ coord: h.coord, phase: o }))),
       getPosition: d => d.coord, radiusUnits: 'meters', stroked: true, filled: true, lineWidthUnits: 'pixels', getLineWidth: 1.5,
-      getRadius: d => { const p = reduceMotion || !mode3d ? 0.5 : ((time / 1.5) + d.phase) % 1; return 70 + p * 520 },
-      getFillColor: d => { const p = reduceMotion || !mode3d ? 0.5 : ((time / 1.5) + d.phase) % 1; return [255, 107, 26, Math.round(34 * (1 - p))] },
-      getLineColor: d => { const p = reduceMotion || !mode3d ? 0.5 : ((time / 1.5) + d.phase) % 1; return [255, 138, 71, Math.round(200 * (1 - p))] },
+      getRadius: d => { const p = animated ? ((time / 1.5) + d.phase) % 1 : 0.5; return 70 + p * 520 },
+      getFillColor: d => { const p = animated ? ((time / 1.5) + d.phase) % 1 : 0.5; return [255, 107, 26, Math.round(34 * (1 - p))] },
+      getLineColor: d => { const p = animated ? ((time / 1.5) + d.phase) % 1 : 0.5; return [255, 138, 71, Math.round(200 * (1 - p))] },
       updateTriggers: { getRadius: time, getFillColor: time, getLineColor: time },
     }),
     new ScatterplotLayer<Hub>({
@@ -311,9 +328,9 @@ export function HeroMap({ mode3d, reduceMotion, resetSignal, lowPower }: Props) 
       onClick={onClick}
       getCursor={({ isHovering, isDragging }) => (isDragging ? 'grabbing' : isHovering ? 'pointer' : 'grab')}
       onError={() => setGlError(true)}
-      useDevicePixels={lowPower ? 1 : true} // weak GPU: draw at 1x, not 1.5x/2x display scaling
+      useDevicePixels={light ? 1 : true} // weak GPU: draw at 1x, not 1.5x/2x display scaling
     >
-      <MapGL ref={mapRef} reuseMaps mapStyle={STYLE[theme]} pixelRatio={lowPower ? 1 : undefined} onLoad={addBuildings} onStyleData={addBuildings} attributionControl={{ compact: true }} />
+      <MapGL ref={mapRef} reuseMaps mapStyle={STYLE[theme]} pixelRatio={light ? 1 : undefined} onLoad={addBuildings} onStyleData={addBuildings} attributionControl={{ compact: true }} />
     </DeckGL>
   )
 }
