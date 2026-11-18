@@ -9,7 +9,8 @@ export default defineConfig({
     tailwindcss(),
     // Installable crew app; the service worker caches the app shell so /field opens with no signal.
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt': a new deploy waits for the user's Reload tap (src/ui/UpdatePrompt.tsx), so half-filled forms survive.
+      registerType: 'prompt',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'Converge-J Fiber Field',
