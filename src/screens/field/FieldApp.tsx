@@ -10,6 +10,7 @@ import { Qr } from '../../ui/Qr'
 import { Sheet } from '../../ui/Sheet'
 import { StatusBadge } from '../../ui/status'
 import { BlockerForm, IncidentForm, UpdateForm, type FormKind } from './FieldForms'
+import { drafts, type Draft } from '../../data/drafts'
 import { flushOutbox, useOnline, useOutbox } from './proof'
 import { outbox } from '../../data/outbox'
 
@@ -70,7 +71,7 @@ export function FieldApp({ within }: { within?: HTMLElement | null }) {
   const netOnline = useOnline()
   const online = netOnline && !simOffline
   const items = useOutbox()
-  const [form, setForm] = useState<{ kind: FormKind; poId: string } | null>(null)
+  const [form, setForm] = useState<{ kind: FormKind; poId: string; draftId: string; draft?: Draft; gen: number } | null>(null)
   const [sheet, setSheet] = useState<'actions' | 'outbox' | 'menu' | null>(null)
   const onlineRef = useRef(online)
   onlineRef.current = online
@@ -87,7 +88,14 @@ export function FieldApp({ within }: { within?: HTMLElement | null }) {
   if (!crew) return <p className="p-6 text-sm text-muted">No crew is linked to this account yet. Ask Backbone Build to assign you to a crew.</p>
   const mine = crew.poIds.map(id => byId.get(id)!).filter(Boolean)
   const msp = snap.contractors.find(c => c.id === crew.contractorId)!
-  const open = (kind: FormKind, poId = mine[0].po.id) => { setSheet(null); setForm({ kind, poId }) }
+  // An unsent draft for this crew, form and PO comes back with the form.
+  const open = async (kind: FormKind, poId = mine[0].po.id) => {
+    const draftId = `${crew.id}.${kind}.${poId}`
+    const draft = await drafts.get(draftId)
+    setSheet(null); setForm({ kind, poId, draftId, draft, gen: Date.now() })
+  }
+  const discardDraft = () => setForm(f => f && { ...f, draft: undefined, gen: Date.now() }) // the form has already cleared its draft
+  const formProps = form && { key: `${form.poId}.${form.gen}`, crew, poId: form.poId, online, onDone: closeForm, draftId: form.draftId, draft: form.draft, onDiscard: discardDraft }
 
   return (
     <div className="relative min-h-full bg-bg pb-28">
@@ -209,9 +217,9 @@ export function FieldApp({ within }: { within?: HTMLElement | null }) {
       </Sheet>
 
       <Sheet within={within} open={!!form} title={form?.kind === 'update' ? 'Progress update' : form?.kind === 'blocker' ? 'Report a blocker' : 'Third-party damage'} onClose={closeForm}>
-        {form?.kind === 'update' && <UpdateForm key={form.poId} crew={crew} poId={form.poId} online={online} onDone={closeForm} />}
-        {form?.kind === 'blocker' && <BlockerForm key={form.poId} crew={crew} poId={form.poId} online={online} onDone={closeForm} />}
-        {form?.kind === 'incident' && <IncidentForm key={form.poId} crew={crew} poId={form.poId} online={online} onDone={closeForm} />}
+        {formProps && form?.kind === 'update' && <UpdateForm {...formProps} />}
+        {formProps && form?.kind === 'blocker' && <BlockerForm {...formProps} />}
+        {formProps && form?.kind === 'incident' && <IncidentForm {...formProps} />}
       </Sheet>
     </div>
   )

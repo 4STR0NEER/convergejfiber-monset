@@ -1,18 +1,23 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Camera, Crosshair, ImagePlus, LocateFixed, MapPinOff, ShieldAlert, ShieldCheck, Trash2, TriangleAlert } from 'lucide-react'
+import { useDraftSaver, type Draft } from '../../data/drafts'
 import { outbox } from '../../data/outbox'
 import { fmtDate } from '../../domain/dates'
 import { distanceToRoute, reasonImpact, validateUpdate } from '../../domain/field'
 import { MILESTONE_LABEL, MILESTONES, type Crew, type MilestoneKey } from '../../domain/types'
 import { useData } from '../../state'
 import { CheckDraw } from '../../ui/CheckDraw'
+import { ago } from '../../ui/format'
 import { compressPhoto, photoSrc } from '../../ui/photo'
 import { SignaturePad } from '../../ui/SignaturePad'
 import { SlideToConfirm } from '../../ui/SlideToConfirm'
 import { nowManila, shortId, useGps, type Fix } from './proof'
 
 export type FormKind = 'update' | 'blocker' | 'incident'
-interface FormProps { crew: Crew; poId: string; online: boolean; onDone: () => void }
+interface FormProps { crew: Crew; poId: string; online: boolean; onDone: () => void; draftId: string; draft?: Draft; onDiscard: () => void }
+
+/** Draft values, typed as the form's own state (whatever was saved; missing keys fall back to the defaults). */
+const restore = <T,>(draft: Draft | undefined) => (draft?.values ?? {}) as Partial<T>
 
 const field = 'w-full rounded-xl border border-border bg-bg px-3 py-2.5 text-[15px] outline-none focus:border-[var(--accent)]'
 
@@ -102,6 +107,16 @@ function GpsProof({ poId, fix, state, locate, useRoutePoint }: { poId: string } 
   )
 }
 
+function Restored({ draft, onDiscard }: { draft?: Draft; onDiscard: () => void }) {
+  if (!draft) return null
+  return (
+    <p role="status" className="flex items-center justify-between gap-3 rounded-xl bg-surface-2 p-3 text-xs">
+      <span>Restored your unsent draft from {ago(draft.at, Date.now())}.</span>
+      <button type="button" onClick={onDiscard} className="shrink-0 font-medium text-accent">Start over</button>
+    </p>
+  )
+}
+
 function Problems({ list }: { list: string[] }) {
   if (!list.length) return null
   return <ul className="space-y-0.5 text-xs text-muted" aria-live="polite">{list.map(p => <li key={p} className="flex items-center gap-1.5"><TriangleAlert size={12} />{p}</li>)}</ul>
@@ -127,18 +142,22 @@ const proofFields = (fix: Fix | null, poId: string, network: ReturnType<typeof u
 
 // ---------------------------------------------------------------- update
 
-export function UpdateForm({ crew, poId: initial, online, onDone }: FormProps) {
+export function UpdateForm({ crew, poId: initial, online, onDone, draftId, draft, onDiscard }: FormProps) {
   const { byId, network } = useData()
-  const [poId, setPoId] = useState(initial)
+  const d = restore<{ poId: string; milestone: MilestoneKey; progress: number; photos: string[]; note: string }>(draft)
+  const [poId, setPoId] = useState(d.poId && byId.has(d.poId) ? d.poId : initial)
   const po = byId.get(poId)!.po
   const current = ([...MILESTONES].reverse().find(k => po.progress[k] > 0 && po.progress[k] < 100) ?? MILESTONES.find(k => po.progress[k] < 100) ?? 'FOC') as MilestoneKey
-  const [milestone, setMilestone] = useState<MilestoneKey>(current)
-  const [progress, setProgress] = useState(po.progress[current])
-  const [photos, setPhotos] = useState<string[]>([])
-  const [note, setNote] = useState('')
+  const [milestone, setMilestone] = useState<MilestoneKey>(d.milestone ?? current)
+  const [progress, setProgress] = useState(d.progress ?? po.progress[current])
+  const [photos, setPhotos] = useState<string[]>(d.photos ?? [])
+  const [note, setNote] = useState(d.note ?? '')
   const [sent, setSent] = useState(false)
   const gps = useGps(network, poId)
-  useEffect(() => { setProgress(po.progress[milestone]) }, [milestone, poId]) // eslint-disable-line react-hooks/exhaustive-deps
+  const saver = useDraftSaver(draftId, { poId, milestone, progress, photos, note })
+  // Changing the PO or milestone starts the slider from that milestone's last reported progress.
+  const pickPo = (id: string) => { setPoId(id); setProgress(byId.get(id)!.po.progress[milestone]) }
+  const pickMilestone = (k: MilestoneKey) => { setMilestone(k); setProgress(po.progress[k]) }
 
   const update = { id: shortId('UP'), poId, crewId: crew.id, milestone, progress, photoIds: photos, at: nowManila(), note: note.trim() || undefined, ...proofFields(gps.fix, poId, network) }
   const problems = validateUpdate(update)
@@ -146,13 +165,14 @@ export function UpdateForm({ crew, poId: initial, online, onDone }: FormProps) {
 
   return (
     <form className="space-y-5 pb-4" onSubmit={e => e.preventDefault()}>
-      <PoPicker crew={crew} value={poId} onChange={setPoId} />
+      <Restored draft={draft} onDiscard={() => saver.clear().then(onDiscard)} />
+      <PoPicker crew={crew} value={poId} onChange={pickPo} />
       <fieldset>
         <legend className="mb-1.5 text-[13px] font-medium">Milestone</legend>
         <div className="grid grid-cols-2 gap-2">
           {MILESTONES.map(k => (
             <label key={k} className={`cursor-pointer rounded-xl border px-3 py-2.5 text-[14px] ${milestone === k ? 'border-[var(--accent)] bg-surface-2 font-semibold' : 'border-border'}`}>
-              <input type="radio" name="milestone" value={k} checked={milestone === k} onChange={() => setMilestone(k)} className="sr-only" />
+              <input type="radio" name="milestone" value={k} checked={milestone === k} onChange={() => pickMilestone(k)} className="sr-only" />
               {MILESTONE_LABEL[k]}<span className="block text-xs font-normal text-muted">now {po.progress[k]}%</span>
             </label>
           ))}
@@ -174,23 +194,25 @@ export function UpdateForm({ crew, poId: initial, online, onDone }: FormProps) {
       </label>
       <Problems list={problems} />
       <SlideToConfirm label="Slide to send update" disabled={problems.length > 0}
-        onConfirm={async () => { await outbox.add({ kind: 'update', update }); setSent(true) }} />
+        onConfirm={async () => { await outbox.add({ kind: 'update', update }); await saver.clear(); setSent(true) }} />
     </form>
   )
 }
 
 // ---------------------------------------------------------------- blocker
 
-export function BlockerForm({ crew, poId: initial, online, onDone }: FormProps) {
+export function BlockerForm({ crew, poId: initial, online, onDone, draftId, draft, onDiscard }: FormProps) {
   const { network, settings, byId } = useData()
-  const [poId, setPoId] = useState(initial)
-  const [code, setCode] = useState('')
-  const [milestone, setMilestone] = useState<MilestoneKey>('ROW')
-  const [start, setStart] = useState(nowManila().slice(0, 10))
-  const [note, setNote] = useState('')
-  const [photos, setPhotos] = useState<string[]>([])
+  const d = restore<{ poId: string; code: string; milestone: MilestoneKey; start: string; note: string; photos: string[] }>(draft)
+  const [poId, setPoId] = useState(d.poId && byId.has(d.poId) ? d.poId : initial)
+  const [code, setCode] = useState(d.code && settings.reasons.some(r => r.code === d.code) ? d.code : '')
+  const [milestone, setMilestone] = useState<MilestoneKey>(d.milestone ?? 'ROW')
+  const [start, setStart] = useState(d.start ?? nowManila().slice(0, 10))
+  const [note, setNote] = useState(d.note ?? '')
+  const [photos, setPhotos] = useState<string[]>(d.photos ?? [])
   const [sent, setSent] = useState(false)
   const gps = useGps(network, poId)
+  const saver = useDraftSaver(draftId, { poId, code, milestone, start, note, photos })
   const impact = code ? reasonImpact(code, settings) : null
   const groups = useMemo(() => [
     { title: 'Not the contractor’s fault (no LD)', items: settings.reasons.filter(r => !r.ldEligible) },
@@ -201,6 +223,7 @@ export function BlockerForm({ crew, poId: initial, online, onDone }: FormProps) 
 
   return (
     <form className="space-y-5 pb-4" onSubmit={e => e.preventDefault()}>
+      <Restored draft={draft} onDiscard={() => saver.clear().then(onDiscard)} />
       <PoPicker crew={crew} value={poId} onChange={setPoId} />
       <fieldset>
         <legend className="mb-1.5 text-[13px] font-medium">What is blocking the work?</legend>
@@ -247,6 +270,7 @@ export function BlockerForm({ crew, poId: initial, online, onDone }: FormProps) 
       <SlideToConfirm label="Slide to report blocker" disabled={problems.length > 0}
         onConfirm={async () => {
           await outbox.add({ kind: 'blocker', delay: { id: shortId('DL'), poId, reasonCode: code, milestone, start, note: note.trim(), reportedBy: crew.lead } })
+          await saver.clear()
           setSent(true)
         }} />
     </form>
@@ -255,23 +279,27 @@ export function BlockerForm({ crew, poId: initial, online, onDone }: FormProps) 
 
 // ---------------------------------------------------------------- incident
 
-export function IncidentForm({ crew, poId: initial, online, onDone }: FormProps) {
+export function IncidentForm({ crew, poId: initial, online, onDone, draftId, draft, onDiscard }: FormProps) {
   const { network, snap, byId } = useData()
-  const [poId, setPoId] = useState(initial)
+  const fresh = (id: string) => {
+    const seg = network.segments.find(s => s.poId === id)
+    return {
+      responsibleParty: '', description: '', ticketRef: '', relatedTickets: '',
+      affectedLink: seg?.corridor ?? '', faultLocation: byId.get(id)!.po.title.split(', ')[1] ?? '',
+      receivedAt: new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 16), restoredAt: '', restorationStatus: 'ongoing' as 'ongoing' | 'temporary' | 'permanent',
+      attName: crew.lead, attPosition: 'Crew Leader', attContact: '',
+      signName: '', signPosition: '', signature: undefined as string | undefined,
+    }
+  }
+  const d = restore<{ poId: string; f: ReturnType<typeof fresh>; photos: string[]; blotter: string[] }>(draft)
+  const [poId, setPoId] = useState(d.poId && byId.has(d.poId) ? d.poId : initial)
   const ev = byId.get(poId)!
-  const seg = network.segments.find(s => s.poId === poId)
-  const local = new Date(Date.now() + 8 * 3_600_000).toISOString().slice(0, 16)
-  const [f, setF] = useState({
-    responsibleParty: '', description: '', ticketRef: '', relatedTickets: '',
-    affectedLink: seg?.corridor ?? '', faultLocation: ev.po.title.split(', ')[1] ?? '',
-    receivedAt: local, restoredAt: '', restorationStatus: 'ongoing' as 'ongoing' | 'temporary' | 'permanent',
-    attName: crew.lead, attPosition: 'Crew Leader', attContact: '',
-    signName: '', signPosition: '', signature: undefined as string | undefined,
-  })
-  const [photos, setPhotos] = useState<string[]>([])
-  const [blotter, setBlotter] = useState<string[]>([])
+  const [f, setF] = useState(() => ({ ...fresh(poId), ...d.f }))
+  const [photos, setPhotos] = useState<string[]>(d.photos ?? [])
+  const [blotter, setBlotter] = useState<string[]>(d.blotter ?? [])
   const [sent, setSent] = useState(false)
   const gps = useGps(network, poId)
+  const saver = useDraftSaver(draftId, { poId, f, photos, blotter })
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
   const msp = snap.contractors.find(c => c.id === crew.contractorId)!
   const problems = [
@@ -297,11 +325,13 @@ export function IncidentForm({ crew, poId: initial, online, onDone }: FormProps)
         undertaking: f.signature ? { name: f.signName, position: f.signPosition, signature: f.signature, at: nowManila(), via: 'crew-phone' } : undefined,
       },
     })
+    await saver.clear()
     setSent(true)
   }
 
   return (
     <form className="space-y-5 pb-4" onSubmit={e => e.preventDefault()}>
+      <Restored draft={draft} onDiscard={() => saver.clear().then(onDiscard)} />
       <p className="rounded-xl bg-surface-2 p-3 text-xs text-muted">Pre-filled from your crew, PO and route. Witnessing MSP: <span className="font-medium text-text">{msp.name}</span></p>
       <PoPicker crew={crew} value={poId} onChange={setPoId} />
       <label className="block"><Label>Responsible party</Label><input value={f.responsibleParty} onChange={set('responsibleParty')} className={field} placeholder="e.g. DPWH road widening subcontractor" /></label>

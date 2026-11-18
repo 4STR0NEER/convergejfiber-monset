@@ -5,7 +5,13 @@ const CHECK_EVERY_MS = 15 * 60_000 // long sessions (live testing, office screen
 /** A new deploy waits until the user taps Reload, so a half-filled field form is never wiped by an update. */
 export function UpdatePrompt() {
   const { needRefresh: [needRefresh, setNeedRefresh], updateServiceWorker } = useRegisterSW({
-    onRegisteredSW: (_url, reg) => { if (reg) setInterval(() => { if (navigator.onLine) reg.update() }, CHECK_EVERY_MS) },
+    onRegisteredSW: (_url, reg) => {
+      if (!reg) return
+      const check = () => { if (navigator.onLine) reg.update() }
+      setInterval(check, CHECK_EVERY_MS)
+      // Coming back to the app (tab switch, phone unlocked) checks right away.
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check() })
+    },
   })
   if (!needRefresh) return null
   return (
