@@ -46,14 +46,18 @@ const hashUnit = (s: string) => { let h = 0; for (const c of s) h = (h * 31 + c.
 /** The intro is a once-per-session moment, not something to sit through on every visit. */
 let introPlayed = false
 
-interface Props { mode3d: boolean; reduceMotion: boolean; resetSignal: number }
+interface Props { mode3d: boolean; reduceMotion: boolean; resetSignal: number; lowPower: boolean }
 
-export function HeroMap({ mode3d, reduceMotion, resetSignal }: Props) {
+const FRAME_MS = 1000 / 30 // the pulse and orbit are slow; 30 fps looks the same and halves the GPU work (more on 120/144 Hz screens)
+
+export function HeroMap({ mode3d, reduceMotion, resetSignal, lowPower }: Props) {
   const { network, snap, byId, matches, matchesScope, selectedId, select, theme, settings } = useData()
   const pinUrl = useMemo(() => nocPin(settings.brand ?? DEFAULT_BRAND), [settings.brand])
-  // Arriving with a PO already selected ("Show on map"): skip the intro and fly straight to it.
-  const [skipIntro] = useState(() => reduceMotion || !!selectedId || introPlayed)
-  const [view, setView] = useState<MapViewState>(skipIntro ? HOME : { ...HOME, zoom: 14.2, pitch: 62, bearing: -40, longitude: NOC[0], latitude: NOC[1] })
+  // Arriving with a PO already selected ("Show on map"), or starting flat in 2D: skip the intro.
+  const [skipIntro] = useState(() => reduceMotion || !mode3d || !!selectedId || introPlayed)
+  const [view, setView] = useState<MapViewState>(skipIntro
+    ? { ...HOME, pitch: mode3d ? HOME.pitch : 0, bearing: mode3d ? HOME.bearing : 0 }
+    : { ...HOME, zoom: 14.2, pitch: 62, bearing: -40, longitude: NOC[0], latitude: NOC[1] })
   const [reveal, setReveal] = useState(skipIntro ? 1 : 0)
   const [time, setTime] = useState(0)
   const [glError, setGlError] = useState(false)
@@ -101,20 +105,22 @@ export function HeroMap({ mode3d, reduceMotion, resetSignal }: Props) {
     return () => { a.revert(); r.revert() }
   }, [skipIntro])
 
-  // ---------- frame loop: pulse + idle orbit ----------
+  // ---------- frame loop: pulse + idle orbit (orbit only on capable GPUs) ----------
   useEffect(() => {
     if (reduceMotion || !mode3d) { orbiting.current = false; return }
     let raf = 0, last = performance.now()
     const frame = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000); last = now
-      setTime(t => (t + dt * 0.6) % PULSE_LOOP)
-      if (!orbiting.current && !selectedId && lastInteraction.current && now - lastInteraction.current > RESUME_ORBIT_MS) orbiting.current = true
-      if (orbiting.current && !selectedId) setView(v => ({ ...v, bearing: (v.bearing ?? 0) + dt * ORBIT_DEG_PER_S, transitionDuration: 0 }))
       raf = requestAnimationFrame(frame)
+      if (now - last < FRAME_MS) return
+      const dt = Math.min(0.1, (now - last) / 1000); last = now
+      setTime(t => (t + dt * 0.6) % PULSE_LOOP)
+      if (lowPower || selectedId) return
+      if (!orbiting.current && lastInteraction.current && now - lastInteraction.current > RESUME_ORBIT_MS) orbiting.current = true
+      if (orbiting.current) setView(v => ({ ...v, bearing: (v.bearing ?? 0) + dt * ORBIT_DEG_PER_S, transitionDuration: 0 }))
     }
     raf = requestAnimationFrame(frame)
     return () => cancelAnimationFrame(raf)
-  }, [reduceMotion, mode3d, selectedId])
+  }, [reduceMotion, mode3d, selectedId, lowPower])
 
   // ---------- fly to the selected segment ----------
   useEffect(() => {
@@ -297,8 +303,9 @@ export function HeroMap({ mode3d, reduceMotion, resetSignal }: Props) {
       onClick={onClick}
       getCursor={({ isHovering, isDragging }) => (isDragging ? 'grabbing' : isHovering ? 'pointer' : 'grab')}
       onError={() => setGlError(true)}
+      useDevicePixels={lowPower ? 1 : true} // weak GPU: draw at 1x, not 1.5x/2x display scaling
     >
-      <MapGL ref={mapRef} reuseMaps mapStyle={STYLE[theme]} onLoad={addBuildings} onStyleData={addBuildings} attributionControl={{ compact: true }} />
+      <MapGL ref={mapRef} reuseMaps mapStyle={STYLE[theme]} pixelRatio={lowPower ? 1 : undefined} onLoad={addBuildings} onStyleData={addBuildings} attributionControl={{ compact: true }} />
     </DeckGL>
   )
 }

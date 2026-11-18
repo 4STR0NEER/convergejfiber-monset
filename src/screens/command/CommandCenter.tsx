@@ -4,6 +4,7 @@ import { Box, List, Map as MapIcon, RotateCcw } from 'lucide-react'
 import { STATUS_LABEL, STATUSES } from '../../domain/status'
 import { useData } from '../../state'
 import { FilterBar } from '../../ui/FilterBar'
+import { lowPowerGpu } from '../../ui/gpu'
 import { LineSample, StatusGlyph } from '../../ui/status'
 import { KpiStrip } from './KpiStrip'
 import { SidePanel } from './SidePanel'
@@ -28,7 +29,9 @@ export function CommandCenter() {
   const phone = useIsPhone()
   // Phones get the list; the map only when asked for (or when arriving from "Show on map").
   const [showMap, setShowMap] = useState(() => !!selectedId)
-  const [mode3d, setMode3d] = useState(() => !window.matchMedia(PHONE).matches)
+  // Phones and weak GPUs start in 2D (no orbit, no pulse); 3D is still one click away.
+  const [lowPower] = useState(lowPowerGpu)
+  const [mode3d, setMode3d] = useState(() => !window.matchMedia(PHONE).matches && !lowPower)
   const [reset, setReset] = useState(0)
   const selected = selectedId ? byId.get(selectedId) : undefined
 
@@ -48,7 +51,7 @@ export function CommandCenter() {
       <FilterBar><MapControls mode3d={mode3d} setMode3d={setMode3d} onReset={() => setReset(n => n + 1)} /></FilterBar>
       <div className="relative min-h-[68vh] flex-1 md:min-h-0">
         <Suspense fallback={<div role="status" className="grid h-full place-items-center text-sm text-muted">Loading the 3D map…</div>}>
-          <HeroMap mode3d={mode3d} reduceMotion={reduce} resetSignal={reset} />
+          <HeroMap mode3d={mode3d} reduceMotion={reduce} resetSignal={reset} lowPower={lowPower} />
         </Suspense>
         <Legend />
         {phone && (
