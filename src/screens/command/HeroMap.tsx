@@ -218,7 +218,7 @@ export function HeroMap({ mode3d, reduceMotion, resetSignal, lowPower }: Props) 
       updateTriggers: { getRadius: time, getFillColor: time, getLineColor: time },
     }),
     new ScatterplotLayer<Hub>({
-      id: 'hubs', data: hubs.filter(h => !h.core), getPosition: h => h.coord, getRadius: h => (h.core ? 9 : 6), radiusUnits: 'pixels',
+      id: 'hubs', data: hubs.filter(h => !h.core), getPosition: h => h.coord, getRadius: h => (h.core ? 9 : 6), radiusUnits: 'pixels', pickable: true,
       stroked: true, getLineWidth: 2.5, lineWidthUnits: 'pixels',
       getFillColor: theme === 'dark' ? [13, 11, 20, 255] : [255, 255, 255, 255], getLineColor: [255, 107, 26, 255],
     }),
@@ -265,6 +265,13 @@ export function HeroMap({ mode3d, reduceMotion, resetSignal, lowPower }: Props) 
     if (layer.id === 'noc') {
       return { style: tipStyle, html: `<b>${(object as Hub).name}</b><div style="opacity:.8">Core node / NOC${/placeholder/i.test((object as Hub).name) ? ': placeholder location until the real node list arrives' : ''}.</div><div>${network.segments.filter(s => s.tier === 'mainline').length} mainline segments, ${network.segments.length} total</div>` }
     }
+    if (layer.id === 'hubs') {
+      const h = object as Hub
+      // Segments don't name their hubs: one with a point within 150 m (ending or passing through) counts as connected.
+      const linked = network.segments.filter(s => s.path.some(p => km(h.coord, p) < 0.15))
+      const main = linked.filter(s => s.tier === 'mainline').length
+      return { style: tipStyle, html: `<b>${h.name}</b><div style="opacity:.8">Hub${/placeholder/i.test(h.name) ? ': placeholder location until the real node list arrives' : ''}.</div><div>${linked.length ? `${linked.length} segment${linked.length > 1 ? 's' : ''} connect here (${main} mainline, ${linked.length - main} sub line)` : 'No segments connect here yet'}</div>` }
+    }
     if (layer.id === 'crews') {
       const c = object as Crew
       const po = byId.get(c.poIds[0])!
@@ -300,6 +307,7 @@ export function HeroMap({ mode3d, reduceMotion, resetSignal, lowPower }: Props) 
       controller={{ dragRotate: mode3d, touchRotate: mode3d, keyboard: true }}
       layers={layers.filter(Boolean)}
       getTooltip={getTooltip}
+      pickingRadius={10} // hover/click hits anything within 10 px of the cursor, not only the exact pixel
       onClick={onClick}
       getCursor={({ isHovering, isDragging }) => (isDragging ? 'grabbing' : isHovering ? 'pointer' : 'grab')}
       onError={() => setGlError(true)}
