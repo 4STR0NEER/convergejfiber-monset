@@ -6,10 +6,18 @@ const WEAK_RENDERER = /swiftshader|llvmpipe|softpipe|basic render|intel.*hd grap
 export const isWeakRenderer = (renderer: string) => WEAK_RENDERER.test(renderer)
 
 let cached: boolean | undefined
+const SLOW_KEY = 'cjf.slowMap'
+
+/** The map measured a low frame rate on this machine: treat it as low power from now on (also next visit). */
+export function markSlowGpu() {
+  cached = true
+  try { localStorage.setItem(SLOW_KEY, '1') } catch { /* this session only */ }
+}
 
 export function lowPowerGpu(): boolean {
   if (cached !== undefined) return cached
   try {
+    if (localStorage.getItem(SLOW_KEY) === '1') return (cached = true)
     // Fails when the browser would fall back to software rendering (no GPU, or hardware acceleration off).
     const gl = document.createElement('canvas').getContext('webgl', { failIfMajorPerformanceCaveat: true })
     if (!gl) return (cached = true)
